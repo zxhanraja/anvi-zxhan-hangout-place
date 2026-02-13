@@ -35,7 +35,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('chat');
   const [accent, setAccent] = useState(() => localStorage.getItem('theme_accent') || '#ffffff');
   const [presence, setPresence] = useState<any>({});
-  const [missYouAlert, setMissYouAlert] = useState<{ sender: User | null; timestamp: number }>({ sender: null, timestamp: 0 });
 
   const [isShaking, setIsShaking] = useState(false);
 
@@ -57,15 +56,8 @@ const App: React.FC = () => {
 
     const unsubMissYou = sync.subscribe('missyou', (data: any) => {
       if (data.sender !== user) {
-        if (data.type === 'shake') {
-          setIsShaking(true);
-          setTimeout(() => setIsShaking(false), 800);
-        } else {
-          setMissYouAlert({ sender: data.sender, timestamp: Date.now() });
-          setIsShaking(true);
-          setTimeout(() => setIsShaking(false), 800);
-          setTimeout(() => setMissYouAlert(prev => prev.timestamp === data.timestamp ? { sender: null, timestamp: 0 } : prev), 5000);
-        }
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 800);
       }
     });
 
@@ -137,7 +129,7 @@ const App: React.FC = () => {
 
     if (type === 'missyou') {
       // Persistent Notification for Anvi's request
-      const notificationMsg = user === 'Anvi' ? 'Anvi is missing u' : 'miss_you';
+      const notificationMsg = user === 'Anvi' ? 'Anvi was missing u' : `${user} was missing u`;
       await sync.sendNotification(user, recipient, notificationMsg);
 
       // Web3Forms Email Trigger (Keeping it as is but it's part of the persistent alert)
@@ -174,11 +166,10 @@ const App: React.FC = () => {
 
   const shakeVariants = {
     shake: {
-      x: [0, -10, 10, -10, 10, -5, 5, 0],
-      rotate: [0, -1, 1, -1, 1, 0],
-      transition: { duration: 0.4 }
+      x: [0, -15, 15, -15, 15, -10, 10, -5, 5, 0],
+      transition: { duration: 0.4, ease: "easeInOut" }
     },
-    idle: { x: 0, rotate: 0 }
+    idle: { x: 0 }
   };
 
   return (
@@ -236,22 +227,6 @@ const App: React.FC = () => {
           </AnimatePresence>
         </div>
 
-        <AnimatePresence>
-          {missYouAlert.sender && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 flex items-center justify-center z-[500] pointer-events-none p-6 bg-black/40 backdrop-blur-sm">
-              <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: -50 }} transition={{ type: "spring", damping: 15, stiffness: 200 }} className="bg-[#0a0a0a] text-white p-8 md:p-16 rounded-[2.5rem] md:rounded-[3rem] shadow-[0_0_100px_rgba(255,255,255,0.2)] flex flex-col items-center gap-6 md:gap-8 border border-white/10 relative overflow-hidden max-w-[90%]">
-                <div className="absolute inset-0 bg-[var(--accent)]/10 blur-3xl" />
-                <motion.div animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }} transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 0.5 }}>
-                  <Heart className="w-16 h-16 md:w-24 md:h-24 text-[var(--accent)] fill-[var(--accent)] drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]" />
-                </motion.div>
-                <div className="text-center relative z-10">
-                  <h3 className="font-display text-2xl md:text-5xl font-black italic uppercase tracking-tighter leading-none mb-2">{missYouAlert.sender}</h3>
-                  <p className="text-white/50 font-bold uppercase tracking-[0.4em] text-[8px] md:text-[10px]">Thinking of you</p>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <MusicSyncBar user={user} />
         <div className="md:hidden h-[75px] md:h-[85px] shrink-0 pointer-events-none" />

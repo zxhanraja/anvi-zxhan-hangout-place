@@ -104,10 +104,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Attach trigger to messages table (runs on every new message)
+-- Attach trigger to tables (runs on every new insert)
 DROP TRIGGER IF EXISTS tr_clean_expired ON public.messages;
 CREATE TRIGGER tr_clean_expired
   AFTER INSERT ON public.messages
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION clean_expired_data();
+
+DROP TRIGGER IF EXISTS tr_clean_expired_notif ON public.notifications;
+CREATE TRIGGER tr_clean_expired_notif
+  AFTER INSERT ON public.notifications
   FOR EACH STATEMENT
   EXECUTE FUNCTION clean_expired_data();
 
