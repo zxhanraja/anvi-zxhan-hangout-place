@@ -193,7 +193,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     if (wordState.setter === user || wordState.guesses.includes(letter)) return;
     const nextGuesses = [...wordState.guesses, letter];
     const uniqueWordLetters = new Set(wordState.word.split(''));
-    const correctGuesses = nextGuesses.filter(l => uniqueWordLetters.size === correctGuesses.length);
+    const correctGuesses = nextGuesses.filter(l => uniqueWordLetters.has(l));
     const isWon = uniqueWordLetters.size === correctGuesses.length;
     const errors = nextGuesses.filter(l => !uniqueWordLetters.has(l)).length;
     const isLost = errors >= 7;
@@ -408,6 +408,34 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
           {reactionState.status !== 'waiting' && reactionState.status !== 'ready' && (
             <button onClick={startReactionGame} className="px-12 py-5 bg-white text-black rounded-full font-black uppercase italic tracking-widest text-xs hover:scale-105 transition-transform shadow-2xl">START BLITZ</button>
           )}
+        </div>
+      )}
+
+      {currentGame === 'tictactoe' && (
+        <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-md pb-40">
+          <div className="text-center space-y-2 mb-4">
+            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">INFINITY TACTICS</h3>
+            <p className="text-[7px] md:text-[8px] font-bold text-[var(--accent)] uppercase tracking-[0.4em]">ONLY 3 MARKS ALLOWED // NO DRAWS POSSIBLE</p>
+          </div>
+          <h3 className="text-lg md:text-xl font-black italic uppercase tracking-tighter">{calculateTTTWinner(board) ? (calculateTTTWinner(board) === 'DRAW' ? "DRAW" : `${calculateTTTWinner(board)} WINS`) : `${xIsNext ? 'X' : 'O'} TURN`}</h3>
+          <div className="grid grid-cols-3 gap-2 md:gap-3 p-3 md:p-4 bg-white/[0.03] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] w-full aspect-square shadow-2xl relative">
+            {board.map((cell, i) => {
+              const myMarks = tttHistory.filter(h => h.symbol === (xIsNext ? 'X' : 'O'));
+              const isOldest = myMarks.length === 3 && myMarks[0].index === i;
+
+              return (
+                <button
+                  key={i}
+                  disabled={!!winner}
+                  onClick={() => handleTTTClick(i)}
+                  className={`bg-[#0a0a0a] border border-white/5 rounded-2xl md:rounded-3xl text-4xl md:text-5xl font-display font-black flex items-center justify-center hover:border-white/20 transition-all active:scale-90 shadow-inner relative overflow-hidden ${isOldest ? 'opacity-30' : ''}`}
+                >
+                  <span className={cell === 'X' ? 'text-blue-500' : 'text-purple-500'}>{cell}</span>
+                  {isOldest && <div className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
