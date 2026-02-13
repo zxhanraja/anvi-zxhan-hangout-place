@@ -90,13 +90,13 @@ CREATE POLICY "Public Access" ON public.scores FOR ALL USING (true) WITH CHECK (
 CREATE OR REPLACE FUNCTION clean_expired_data() 
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Delete messages older than 48 hours (assuming expiresAt is set correctly on insert)
+  -- Delete messages where expiresAt is in the past
   DELETE FROM public.messages WHERE "expiresAt" < (EXTRACT(EPOCH FROM NOW()) * 1000);
   
   -- Delete notifications older than 48 hours
   DELETE FROM public.notifications WHERE timestamp < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (48 * 60 * 60 * 1000));
   
-  -- Reset scores older than 24 hours
+  -- Reset scores older than 24 hours (Arcade keeps resets daily)
   UPDATE public.scores SET score = 0, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000) 
   WHERE updated_at < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (24 * 60 * 60 * 1000));
   

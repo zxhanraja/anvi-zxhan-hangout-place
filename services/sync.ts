@@ -70,24 +70,64 @@ class SyncService {
 
   async saveMessage(msg: any) {
     if (!navigator.onLine) {
-      this.offlineQueue.push({ type: 'message', data: msg });
-      this.saveLocal('offline_queue', this.offlineQueue);
+      console.log('Offline: Queuing message', msg.id);
+      this.addToQueue({ type: 'message', data: msg });
       return;
     }
 
-    const { error } = await supabase.from('messages').insert([msg]);
-    if (error) {
-      console.error('Error saving message:', error);
-      // If error is network related, queue it
-      this.offlineQueue.push({ type: 'message', data: msg });
+    try {
+      const { error } = await supabase.from('messages').insert([msg]);
+      if (error) {
+        console.error('Supabase error saving message, queuing...', error);
+        this.addToQueue({ type: 'message', data: msg });
+      }
+    } catch (e) {
+      console.error('Network catch saving message, queuing...', e);
+      this.addToQueue({ type: 'message', data: msg });
+    }
+  }
+
+  private addToQueue(item: any) {
+    if (!this.offlineQueue.find(q => q.data.id === item.data.id)) {
+      this.offlineQueue.push(item);
       this.saveLocal('offline_queue', this.offlineQueue);
+    }
+    // Trigger any UI listeners that might want to know queue changed
+    if (this.listeners['queue_change']) {
+      this.listeners['queue_change'].forEach(cb => cb(this.offlineQueue));
+    }
+  }
+
+  async processOfflineQueue() {
+    if (!navigator.onLine || this.offlineQueue.length === 0) return;
+
+    console.log('Processing offline queue...');
+    const queue = [...this.offlineQueue];
+    this.offlineQueue = [];
+    this.saveLocal('offline_queue', []);
+
+    for (const item of queue) {
+      try {
+        if (item.type === 'message') {
+          const { error } = await supabase.from('messages').insert([item.data]);
+          if (error) throw error;
+        } else if (item.type === 'notification') {
+          await this.sendNotification(item.data.from, item.data.to, item.data.type);
+        }
+      } catch (e) {
+        console.error('Failed to process queue item, returning to queue:', e);
+        this.addToQueue(item);
+      }
+    }
+
+    if (this.listeners['queue_change']) {
+      this.listeners['queue_change'].forEach(cb => cb(this.offlineQueue));
     }
   }
 
   async sendNotification(from: string, to: string, type: string) {
     if (!navigator.onLine) {
-      this.offlineQueue.push({ type: 'notification', data: { from, to, type, timestamp: Date.now() } });
-      this.saveLocal('offline_queue', this.offlineQueue);
+      this.addToQueue({ type: 'notification', data: { from, to, type, timestamp: Date.now() } });
       return;
     }
     await supabase.from('notifications').insert([{ sender: from, recipient: to, type, timestamp: Date.now() }]);
@@ -143,20 +183,8 @@ class SyncService {
     return data || [];
   }
 
-  async processOfflineQueue() {
-    if (!navigator.onLine || this.offlineQueue.length === 0) return;
-
-    const queue = [...this.offlineQueue];
-    this.offlineQueue = [];
-    this.saveLocal('offline_queue', []);
-
-    for (const item of queue) {
-      if (item.type === 'message') {
-        await this.saveMessage(item.data);
-      } else if (item.type === 'notification') {
-        await this.sendNotification(item.data.from, item.data.to, item.data.type);
-      }
-    }
+  getQueue() {
+    return this.offlineQueue;
   }
 
   async fetchMessages() {

@@ -31,6 +31,7 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [offlineQueue, setOfflineQueue] = useState<any[]>(sync.getQueue());
   const emojiPickerRef = useRef<HTMLDivElement>(null); // Ref for outside click
 
   useEffect(() => {
@@ -46,6 +47,11 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
       }
     };
     loadMessages();
+
+    // Listen to queue changes (for visual syncing status)
+    const unsubQueue = sync.subscribe('queue_change', (queue: any[]) => {
+      setOfflineQueue(queue);
+    });
 
     // Subscribe to new messages from Supabase Realtime
     console.log('Subscribing to messages_channel...');
@@ -83,6 +89,7 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
       console.log('Unsubscribing from channels');
       subscription.unsubscribe();
       unsubChat();
+      unsubQueue();
     };
   }, []);
 
@@ -117,10 +124,8 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     if (image) type = 'image';
     if (audio) type = 'voice';
 
-    // Expiry: Voice 8h, Chat 48h, Image 12h
-    let expiryHours = 48;
-    if (type === 'image') expiryHours = 12;
-    if (type === 'voice') expiryHours = 8;
+    // Expiry: 48h for all (Text, Image, Voice) as requested
+    const expiryHours = 48;
 
     const msg: Message = {
       id: Math.random().toString(36).substr(2, 9),
@@ -260,6 +265,23 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
                     </div>
                   )}
                   {m.type === 'text' && m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+
+                  {/* Status Indicator */}
+                  {m.sender === user && (
+                    <div className="flex justify-end mt-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                      {offlineQueue.find(q => q.data?.id === m.id) ? (
+                        <div className="flex items-center gap-1 text-[8px] italic">
+                          <StopCircle className="w-2 h-2 animate-pulse" />
+                          <span>Syncing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[8px]">
+                          <Shield className="w-2 h-2" />
+                          <span>Saved</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className={`absolute -top-7 flex gap-1 bg-black/90 border border-white/10 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-75 z-20 ${m.sender === user ? 'right-0' : 'left-0'}`}>
                   {REACTION_EMOJIS.slice(0, 5).map(e => <button key={e} onClick={() => addReaction(m.id, e)} className="hover:scale-125 transition-transform">{e}</button>)}
