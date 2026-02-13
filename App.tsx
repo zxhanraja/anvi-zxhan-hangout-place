@@ -66,36 +66,40 @@ const App: React.FC = () => {
       if (data) {
         const p: any = {};
         data.forEach((item: any) => {
-          p[item.user_id] = { user: item.user_id, isOnline: item.is_online };
+          p[item.user_id] = { user: item.user_id, isOnline: item.is_online, lastSeen: item.last_seen };
         });
         setPresence(p);
       }
     });
 
-    // Heartbeat mechanism
+    // Heartbeat mechanism for Presence
     let heartbeat: any;
     if (user) {
-      sync.updatePresence(user, true); // Initial online status
+      // Update our own heartbeat immediately
+      sync.updatePresence(user, true);
 
       heartbeat = setInterval(() => {
         sync.updatePresence(user, true);
-      }, 30000); // 30 seconds heartbeat
+      }, 10000); // 10 seconds heartbeat for better accuracy
 
-      // Handle visibility changes
-      const handleVisibility = () => {
-        if (document.hidden) {
-          sync.updatePresence(user, false);
-        } else {
-          sync.updatePresence(user, true);
-        }
-      };
+      // Monitor "Last Seen" for others every 5s
+      const presenceInterval = setInterval(() => {
+        setPresence((prev: any) => {
+          const now = Date.now();
+          const updated = { ...prev };
+          Object.keys(updated).forEach(u => {
+            // If last seen more than 40 seconds ago, mark as away
+            if (updated[u].lastSeen && now - updated[u].lastSeen > 40000) {
+              updated[u] = { ...updated[u], isOnline: false };
+            }
+          });
+          return updated;
+        });
+      }, 5000);
 
-      // Handle window close
       const handleUnload = () => {
         sync.updatePresence(user, false);
       };
-
-      document.addEventListener('visibilitychange', handleVisibility);
       window.addEventListener('beforeunload', handleUnload);
 
       return () => {
@@ -103,7 +107,7 @@ const App: React.FC = () => {
         unsubPresence();
         unsubMissYou();
         clearInterval(heartbeat);
-        document.removeEventListener('visibilitychange', handleVisibility);
+        clearInterval(presenceInterval);
         window.removeEventListener('beforeunload', handleUnload);
       };
     }
