@@ -17,16 +17,16 @@ interface SidebarProps {
   onLogout: () => void;
   accent: string;
   setAccent: (c: string) => void;
-  onMissYou: () => void;
+  onMissYou: (type: 'shake' | 'missyou') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ active, setActive, user, onLogout, accent, onMissYou }) => {
-  const [missuPulse, setMissuPulse] = useState(false);
+  const [pulse, setPulse] = useState<'shake' | 'missyou' | null>(null);
 
-  const handleShakeClick = () => {
-    setMissuPulse(true);
-    setTimeout(() => setMissuPulse(false), 1000);
-    onMissYou();
+  const handleAction = (type: 'shake' | 'missyou') => {
+    setPulse(type);
+    setTimeout(() => setPulse(null), 1000);
+    onMissYou(type);
   };
 
   const items = [
@@ -50,17 +50,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, setActive, user, onLog
         </div>
 
         <nav className="flex-1 flex flex-col items-center lg:items-stretch gap-4">
-          {/* Heart Icon - Miss You Desktop (Only for Anvi) */}
-          {user === 'Anvi' && (
-            <button
-              onClick={handleShakeClick}
-              className={`w-12 lg:w-full flex items-center justify-center lg:justify-start gap-5 p-3.5 lg:p-4 rounded-full transition-all group shrink-0 bg-white/[0.03] border border-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.08] ${missuPulse ? 'scale-95 bg-white/10' : ''}`}
-            >
-              <Heart className={`w-5 h-5 shrink-0 ${missuPulse ? 'animate-pulse fill-white' : ''}`} />
-              <span className="hidden lg:block font-black uppercase tracking-widest text-[10px] italic">MISSING U</span>
-            </button>
-          )}
-
           {items.map(item => (
             <button
               key={item.id}
@@ -72,22 +61,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, setActive, user, onLog
               <span className="hidden lg:block font-black uppercase tracking-widest text-[10px] italic">{item.label}</span>
             </button>
           ))}
+
+          {/* Heart Icon - MISSING U (Below Arcade) */}
+          {user === 'Anvi' && (
+            <button
+              onClick={() => handleAction('missyou')}
+              className={`w-12 lg:w-full flex items-center justify-center lg:justify-start gap-5 p-3.5 lg:p-4 rounded-full transition-all group shrink-0 bg-white/[0.03] border border-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.08] ${pulse === 'missyou' ? 'scale-95 bg-white/10' : ''}`}
+            >
+              <Heart className={`w-5 h-5 shrink-0 ${pulse === 'missyou' ? 'animate-pulse fill-white' : ''}`} />
+              <div className="hidden lg:block text-left min-w-0">
+                <span className="block font-black uppercase tracking-widest text-[10px] italic">MISSING U</span>
+                <span className="block text-[7px] text-white/30 tracking-wider">Alert Zxhan</span>
+              </div>
+            </button>
+          )}
         </nav>
 
         <div className="mt-auto flex flex-col items-center lg:items-stretch gap-4 pt-8 border-t border-white/[0.03]">
-          {/* Bell Icon for Shake */}
+          {/* Bell Icon for Shake - ONLY SCREEN SHAKE */}
           <button
-            onClick={handleShakeClick}
-            className={`w-12 lg:w-full flex items-center justify-center lg:justify-start gap-4 p-3 lg:p-4 rounded-full bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] transition-all group ${missuPulse ? 'scale-95 bg-white/10' : ''}`}
+            onClick={() => handleAction('shake')}
+            className={`w-12 lg:w-full flex items-center justify-center lg:justify-start gap-4 p-3 lg:p-4 rounded-full bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] transition-all group ${pulse === 'shake' ? 'scale-95 bg-white/10' : ''}`}
           >
-            <Bell className={`w-5 h-5 text-white/60 group-hover:text-white transition-colors ${missuPulse ? 'animate-bounce' : ''}`} />
+            <Bell className={`w-5 h-5 text-white/60 group-hover:text-white transition-colors ${pulse === 'shake' ? 'animate-bounce' : ''}`} />
             <div className="hidden lg:block text-left min-w-0">
               <span className="block text-[10px] font-black uppercase tracking-widest text-white/80">Shake</span>
-              <span className="block text-[8px] text-white/30 tracking-wider">Alert Partner</span>
+              <span className="block text-[8px] text-white/30 tracking-wider">Vibrate Screen</span>
             </div>
           </button>
 
-          {/* Profile & Logout Section - Separated for Narrow view */}
+          {/* Profile & Logout Section */}
           <div className="flex flex-col lg:flex-row items-center gap-3 lg:gap-4 lg:p-4 lg:bg-white/[0.02] lg:rounded-3xl lg:border lg:border-white/[0.05] group shrink-0">
             <div className="w-12 h-12 lg:w-9 lg:h-9 rounded-full border border-white/10 flex items-center justify-center text-lg bg-black shrink-0 overflow-hidden">
               <img
@@ -111,17 +114,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, setActive, user, onLog
 
       {/* Mobile Navigation Dock */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[85px] bg-[#000000] border-t border-white/[0.05] flex justify-around items-center px-4 z-[250] pb-4">
-        {/* Heart Icon - Miss You (Only for Anvi) */}
-        {user === 'Anvi' && (
-          <button
-            onClick={handleShakeClick}
-            className={`flex flex-col items-center gap-1.5 flex-1 transition-all ${missuPulse ? 'text-white' : 'text-white/20'}`}
-          >
-            <Heart className={`w-5 h-5 ${missuPulse ? 'animate-pulse fill-white' : ''}`} />
-            <span className="text-[7px] font-black uppercase tracking-[0.2em] italic leading-none">LOVE</span>
-          </button>
-        )}
-
         {items.map(item => (
           <button
             key={item.id}
@@ -134,15 +126,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, setActive, user, onLog
           </button>
         ))}
 
-        {/* Mobile Bell Button - Always Visible */}
+        {/* Heart Icon - MISSING U (After Arcade) */}
+        {user === 'Anvi' && (
+          <button
+            onClick={() => handleAction('missyou')}
+            className={`flex flex-col items-center gap-1.5 flex-1 transition-all ${pulse === 'missyou' ? 'text-white' : 'text-white/20'}`}
+          >
+            <Heart className={`w-5 h-5 ${pulse === 'missyou' ? 'animate-pulse fill-white' : ''}`} />
+            <span className="text-[7px] font-black uppercase tracking-[0.2em] italic leading-none">LOVE</span>
+          </button>
+        )}
+
+        {/* Mobile Bell Button - SHAKE ONLY */}
         <button
-          onClick={handleShakeClick}
-          className={`flex flex-col items-center gap-1.5 flex-1 transition-all ${missuPulse ? 'text-white' : 'text-white/20'}`}
+          onClick={() => handleAction('shake')}
+          className={`flex flex-col items-center gap-1.5 flex-1 transition-all ${pulse === 'shake' ? 'text-white' : 'text-white/20'}`}
         >
-          <Bell className={`w-5 h-5 ${missuPulse ? 'animate-bounce text-white' : ''}`} />
+          <Bell className={`w-5 h-5 ${pulse === 'shake' ? 'animate-bounce text-white' : ''}`} />
           <span className="text-[7px] font-black uppercase tracking-[0.2em] italic leading-none">SHAKE</span>
         </button>
       </nav>
+
     </>
   );
 };

@@ -57,10 +57,15 @@ const App: React.FC = () => {
 
     const unsubMissYou = sync.subscribe('missyou', (data: any) => {
       if (data.sender !== user) {
-        setMissYouAlert({ sender: data.sender, timestamp: Date.now() });
-        setIsShaking(true);
-        setTimeout(() => setIsShaking(false), 800);
-        setTimeout(() => setMissYouAlert(prev => prev.timestamp === data.timestamp ? { sender: null, timestamp: 0 } : prev), 4000);
+        if (data.type === 'shake') {
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 800);
+        } else {
+          setMissYouAlert({ sender: data.sender, timestamp: Date.now() });
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 800);
+          setTimeout(() => setMissYouAlert(prev => prev.timestamp === data.timestamp ? { sender: null, timestamp: 0 } : prev), 5000);
+        }
       }
     });
 
@@ -118,40 +123,40 @@ const App: React.FC = () => {
     };
   }, [user]);
 
-  // ... (keeping other useEffects)
-
   const handleLogin = (u: User) => {
     setUser(u);
     localStorage.setItem('user_id', u);
   };
 
-  const handleMissYou = async () => {
+  const handleMissYou = async (type: 'shake' | 'missyou') => {
     if (!user) return;
     const recipient = user === 'Anvi' ? 'Zxhan' : 'Anvi';
 
-    // cinematic broadcast
-    sync.publish('missyou', { sender: user, timestamp: Date.now(), isAnvi: user === 'Anvi' });
+    // Heartbeat/Cinematic broadcast
+    sync.publish('missyou', { sender: user, timestamp: Date.now(), type });
 
-    // Persistent Notification - Optimized for Supabase as requested
-    const notificationMsg = user === 'Anvi' ? 'Anvi is missing u' : 'miss_you';
-    await sync.sendNotification(user, recipient, notificationMsg);
+    if (type === 'missyou') {
+      // Persistent Notification for Anvi's request
+      const notificationMsg = user === 'Anvi' ? 'Anvi is missing u' : 'miss_you';
+      await sync.sendNotification(user, recipient, notificationMsg);
 
-    // Web3Forms Email Trigger
-    try {
-      await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_key: 'YOUR-WEB3FORMS-KEY-HERE',
-          subject: user === 'Anvi' ? 'Anvi is missing you!' : `${user} misses you!`,
-          message: user === 'Anvi'
-            ? `Hey Zxhan, Anvi just sent you a signal from your Private Hangout. She's thinking about you!`
-            : `Hey ${recipient}, ${user} just sent you a signal from your Private Hangout. Go check it out!`,
-          from_name: 'Hangout Bot'
-        })
-      });
-    } catch (e) {
-      console.error('Failed to send email notification');
+      // Web3Forms Email Trigger (Keeping it as is but it's part of the persistent alert)
+      try {
+        await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_key: 'YOUR-WEB3FORMS-KEY-HERE', // User should replace this
+            subject: user === 'Anvi' ? 'Anvi is missing you!' : `${user} misses you!`,
+            message: user === 'Anvi'
+              ? `Hey Zxhan, Anvi just sent you a signal from your Private Hangout. She's thinking about you!`
+              : `Hey ${recipient}, ${user} just sent you a signal from your Private Hangout. Go check it out!`,
+            from_name: 'Hangout Bot'
+          })
+        });
+      } catch (e) {
+        console.error('Failed to send email notification');
+      }
     }
   };
 
@@ -169,33 +174,33 @@ const App: React.FC = () => {
 
   const shakeVariants = {
     shake: {
-      x: [0, -20, 20, -20, 20, -10, 10, -5, 5, 0],
-      transition: { duration: 0.5 }
+      x: [0, -10, 10, -10, 10, -5, 5, 0],
+      rotate: [0, -1, 1, -1, 1, 0],
+      transition: { duration: 0.4 }
     },
-    idle: { x: 0 }
+    idle: { x: 0, rotate: 0 }
   };
 
   return (
     <motion.div
       variants={shakeVariants}
       animate={isShaking ? 'shake' : 'idle'}
-      className="h-[100dvh] w-full flex flex-col md:flex-row overflow-hidden text-white bg-[#000000] select-none"
+      className="h-[100dvh] w-full flex flex-col md:flex-row overflow-hidden text-white bg-[#000000] select-none fixed inset-0"
       style={{ '--accent': accent } as any}
     >
       <Sidebar active={activeTab} setActive={setActiveTab} user={user} onLogout={() => { setUser(null); localStorage.removeItem('user_id'); }} accent={accent} setAccent={handleSetAccent} onMissYou={handleMissYou} />
       <main className="flex-1 relative flex flex-col bg-[#000000] min-w-0 h-full overflow-hidden">
-        {/* ... (Main Content) ... */}
-        <header className="px-4 md:px-10 py-4 border-b border-white/[0.03] flex justify-between items-center z-50 bg-[#000000]/80 backdrop-blur-2xl shrink-0">
-          <h2 className="font-display text-sm md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
+        <header className="px-4 md:px-10 py-3 md:py-4 border-b border-white/[0.03] flex justify-between items-center z-50 bg-[#000000]/80 backdrop-blur-2xl shrink-0">
+          <h2 className="font-display text-xs md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
             <div className="flex flex-col items-end">
-              <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
+              <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className={`w-1 h-1 rounded-full ${isOtherOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-white/5'}`} />
-                <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-tighter ${isOtherOnline ? 'text-green-500/60' : 'text-white/10'}`}>{isOtherOnline ? 'Active' : 'Away'}</span>
+                <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${isOtherOnline ? 'text-green-500/60' : 'text-white/10'}`}>{isOtherOnline ? 'Active' : 'Away'}</span>
               </div>
             </div>
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
+            <div className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
               <img
                 src={otherUser === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb}
                 alt={otherUser}
@@ -234,14 +239,14 @@ const App: React.FC = () => {
         <AnimatePresence>
           {missYouAlert.sender && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 flex items-center justify-center z-[500] pointer-events-none p-6 bg-black/40 backdrop-blur-sm">
-              <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: -50 }} transition={{ type: "spring", damping: 15, stiffness: 200 }} className="bg-[#0a0a0a] text-white p-10 md:p-16 rounded-[3rem] shadow-[0_0_100px_rgba(255,255,255,0.2)] flex flex-col items-center gap-8 border border-white/10 relative overflow-hidden">
+              <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: -50 }} transition={{ type: "spring", damping: 15, stiffness: 200 }} className="bg-[#0a0a0a] text-white p-8 md:p-16 rounded-[2.5rem] md:rounded-[3rem] shadow-[0_0_100px_rgba(255,255,255,0.2)] flex flex-col items-center gap-6 md:gap-8 border border-white/10 relative overflow-hidden max-w-[90%]">
                 <div className="absolute inset-0 bg-[var(--accent)]/10 blur-3xl" />
                 <motion.div animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }} transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 0.5 }}>
-                  <Heart className="w-24 h-24 text-[var(--accent)] fill-[var(--accent)] drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]" />
+                  <Heart className="w-16 h-16 md:w-24 md:h-24 text-[var(--accent)] fill-[var(--accent)] drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]" />
                 </motion.div>
                 <div className="text-center relative z-10">
-                  <h3 className="font-display text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none mb-2">{missYouAlert.sender}</h3>
-                  <p className="text-white/50 font-bold uppercase tracking-[0.4em] text-[10px]">Thinking of you</p>
+                  <h3 className="font-display text-2xl md:text-5xl font-black italic uppercase tracking-tighter leading-none mb-2">{missYouAlert.sender}</h3>
+                  <p className="text-white/50 font-bold uppercase tracking-[0.4em] text-[8px] md:text-[10px]">Thinking of you</p>
                 </div>
               </motion.div>
             </motion.div>
@@ -249,9 +254,10 @@ const App: React.FC = () => {
         </AnimatePresence>
 
         <MusicSyncBar user={user} />
-        <div className="md:hidden h-[85px] shrink-0 pointer-events-none" />
+        <div className="md:hidden h-[75px] md:h-[85px] shrink-0 pointer-events-none" />
       </main>
     </motion.div>
+
   );
 };
 

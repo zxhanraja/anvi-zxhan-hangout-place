@@ -43,8 +43,16 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   sender text NOT NULL,
   recipient text NOT NULL,
   type text NOT NULL,
+  content text,
   timestamp bigint NOT NULL,
   read boolean DEFAULT false
+);
+
+-- SCORES (Arcade Scoreboard - Resets every 24h)
+CREATE TABLE IF NOT EXISTS public.scores (
+  user_id text PRIMARY KEY,
+  score int DEFAULT 0,
+  updated_at bigint NOT NULL
 );
 
 -- ==========================================
@@ -69,6 +77,10 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public Access" ON public.notifications;
 CREATE POLICY "Public Access" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
+ALTER TABLE public.scores ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON public.scores;
+CREATE POLICY "Public Access" ON public.scores FOR ALL USING (true) WITH CHECK (true);
+
 -- ==========================================
 -- AUTOMATED CLEANUP (The Cron part)
 -- ==========================================
@@ -78,11 +90,15 @@ CREATE POLICY "Public Access" ON public.notifications FOR ALL USING (true) WITH 
 CREATE OR REPLACE FUNCTION clean_expired_data() 
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Delete messages older than current time
+  -- Delete messages older than 48 hours (assuming expiresAt is set correctly on insert)
   DELETE FROM public.messages WHERE "expiresAt" < (EXTRACT(EPOCH FROM NOW()) * 1000);
   
   -- Delete notifications older than 48 hours
   DELETE FROM public.notifications WHERE timestamp < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (48 * 60 * 60 * 1000));
+  
+  -- Reset scores older than 24 hours
+  UPDATE public.scores SET score = 0, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000) 
+  WHERE updated_at < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (24 * 60 * 60 * 1000));
   
   RETURN NEW;
 END;
@@ -98,10 +114,31 @@ CREATE TRIGGER tr_clean_expired
 -- ==========================================
 -- ENABLE REALTIME
 -- ==========================================
--- IMPORTANT: Run these to make sure sync works!
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.presence;
-alter publication supabase_realtime add table public.sync_state;
+-- Safe publication setup to avoid "already member" errors
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  table_list text[] := ARRAY['messages', 'presence', 'sync_state', 'scores', 'notifications'];
+  t text;
+BEGIN
+  FOREACH t IN ARRAY table_list
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' 
+      AND schemaname = 'public' 
+      AND tablename = t
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
+    END IF;
+  END LOOP;
+END $$;
 
 -- VERCEL DEPLOYMENT NOTES
 -- ==========================================

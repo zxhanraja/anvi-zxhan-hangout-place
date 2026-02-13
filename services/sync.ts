@@ -113,6 +113,31 @@ class SyncService {
     }
   }
 
+  async updateScore(user: string, points: number) {
+    // Fetch current score
+    const { data } = await supabase.from('scores').select('score').eq('user_id', user).single();
+    const currentScore = data?.score || 0;
+
+    // Upsert new score
+    await supabase.from('scores').upsert({
+      user_id: user,
+      score: currentScore + points,
+      updated_at: Date.now()
+    });
+
+    // Broadcast update
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'state_change',
+      payload: { type: 'scores', data: { user, score: currentScore + points } },
+    });
+  }
+
+  async fetchScores() {
+    const { data } = await supabase.from('scores').select('*');
+    return data || [];
+  }
+
   async fetchNotifications(user: string) {
     const { data } = await supabase.from('notifications').select('*').eq('recipient', user).order('timestamp', { ascending: false });
     return data || [];

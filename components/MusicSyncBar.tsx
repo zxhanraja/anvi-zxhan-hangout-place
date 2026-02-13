@@ -9,27 +9,107 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [ytLink, setYtLink] = useState('');
-  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '' });
-  const playerRef = useRef<HTMLIFrameElement>(null);
+  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '', startTime: 0 });
+  const [playerReady, setPlayerReady] = useState(false);
+
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Load YouTube API
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+
+    (window as any).onYouTubeIframeAPIReady = () => {
+      console.log('YT API Ready');
+    };
+
     // Initial fetch
     supabase.from('sync_state').select('*').eq('key', 'music').single().then(({ data }) => {
       if (data) setCurrentMusic(data.data);
     });
 
-    const unsub = sync.subscribe('music', (data: any) => setCurrentMusic(data));
+    const unsub = sync.subscribe('music', (data: any) => {
+      setCurrentMusic(data);
+    });
+
     return () => unsub();
   }, []);
+
+  // Sync player state with currentMusic
+  useEffect(() => {
+    if (!currentMusic.ytId) return;
+
+    if (!playerRef.current) {
+      if (!(window as any).YT || !(window as any).YT.Player) return;
+
+      playerRef.current = new (window as any).YT.Player('yt-player-hidden', {
+        height: '0',
+        width: '0',
+        videoId: currentMusic.ytId,
+        playerVars: {
+          autoplay: currentMusic.isPlaying ? 1 : 0,
+          controls: 0,
+          showinfo: 0,
+          rel: 0,
+          enablejsapi: 1,
+        },
+        events: {
+          onReady: (event: any) => {
+            setPlayerReady(true);
+            if (currentMusic.isPlaying) event.target.playVideo();
+          },
+          onStateChange: (event: any) => {
+            // Handle automatic looping or end of track if needed
+            if (event.data === (window as any).YT.PlayerState.ENDED) {
+              event.target.playVideo();
+            }
+          }
+        }
+      });
+    } else {
+      // Player already exists, check if ID changed
+      const currentUrl = playerRef.current.getVideoUrl();
+      if (currentUrl && !currentUrl.includes(currentMusic.ytId)) {
+        playerRef.current.loadVideoById(currentMusic.ytId);
+      }
+
+      // Sync Play/Pause
+      if (playerReady) {
+        if (currentMusic.isPlaying) {
+          playerRef.current.playVideo();
+        } else {
+          playerRef.current.pauseVideo();
+        }
+      }
+    }
+  }, [currentMusic.ytId, currentMusic.isPlaying, playerReady]);
 
   const handlePlayNew = () => {
     const id = ytLink.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/)?.[2];
     if (!id || id.length !== 11) return;
-    const data = { isPlaying: true, ytId: id, title: 'STREAM', addedBy: user, startTime: Date.now() };
+
+    const data = {
+      isPlaying: true,
+      ytId: id,
+      title: 'SYNCED BEAT',
+      addedBy: user,
+      startTime: Date.now()
+    };
+
     sync.publish('music', data);
     setCurrentMusic(data);
     setYtLink('');
     setIsOpen(false);
+
+    if (playerRef.current && playerReady) {
+      playerRef.current.loadVideoById(id);
+      playerRef.current.playVideo();
+    }
   };
 
   const togglePlayback = () => {
@@ -40,18 +120,20 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <>
-      {currentMusic.ytId && <iframe ref={playerRef} className="fixed -top-[2000px] left-0 pointer-events-none opacity-0" src={`https://www.youtube.com/embed/${currentMusic.ytId}?autoplay=1&controls=0&mute=0&enablejsapi=1&loop=1&playlist=${currentMusic.ytId}${currentMusic.isPlaying ? '' : '&pause=1'}`} allow="autoplay" />}
+      {/* Hidden Player Div */}
+      <div id="yt-player-hidden" className="fixed -top-[1000px] left-0 pointer-events-none opacity-0" />
 
       {/* Dynamic Positioning - Top on Mobile, Corner on Desktop */}
       <div
+        ref={containerRef}
         className="fixed top-20 left-0 right-0 flex justify-center md:top-auto md:bottom-8 md:right-8 md:left-auto md:justify-end z-[150] pointer-events-none px-4"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         <motion.div
           animate={{
-            width: isHovered || currentMusic.isPlaying || window.innerWidth < 768 ? 'auto' : '44px',
-            opacity: isHovered || currentMusic.isPlaying || window.innerWidth < 768 ? 1 : 0.4
+            width: isHovered || currentMusic.isPlaying || (typeof window !== 'undefined' && window.innerWidth < 768) ? 'auto' : '44px',
+            opacity: isHovered || currentMusic.isPlaying || (typeof window !== 'undefined' && window.innerWidth < 768) ? 1 : 0.4
           }}
           className="bg-[#0f0f0f]/90 backdrop-blur-3xl border border-white/5 rounded-full p-1 flex items-center gap-2 shadow-2xl pointer-events-auto transition-all overflow-hidden"
         >
