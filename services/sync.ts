@@ -188,12 +188,24 @@ class SyncService {
   }
 
   async fetchMessages() {
+    console.log('Sync: Fetching messages from Supabase...');
     const { data, error } = await supabase
       .from('messages')
       .select('*')
       .order('timestamp', { ascending: true })
       .limit(100);
-    return error ? [] : data;
+
+    if (error) {
+      console.error('Supabase fetch error:', error.message, error.details, error.hint);
+      // If we are getting a 404 or connection error, it's likely the URL/Key is wrong
+      if (error.message.includes('FetchError') || error.message.includes('Failed to fetch')) {
+        console.warn('CRITICAL: Supabase connection failed. Check your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
+      }
+      return [];
+    }
+
+    console.log(`Sync: Successfully fetched ${data?.length || 0} messages`);
+    return data || [];
   }
 
   saveLocal(key: string, data: any) {

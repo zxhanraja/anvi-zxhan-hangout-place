@@ -39,10 +39,19 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     const loadMessages = async () => {
       try {
         const msgs = await sync.fetchMessages();
-        setMessages(msgs);
-        console.log('Successfully fetched messages');
+        const queuedMsgs = sync.getQueue()
+          .filter((item: any) => item.type === 'message')
+          .map((item: any) => item.data);
+
+        // Merge and deduplicate
+        setMessages(prev => {
+          const combined = [...msgs, ...queuedMsgs];
+          const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
+          return unique.sort((a: any, b: any) => a.timestamp - b.timestamp);
+        });
+        console.log('Successfully loaded messages (including queue)');
       } catch (err) {
-        console.error('Failed to fetch messages, retrying...', err);
+        console.error('Failed to load messages, retrying...', err);
         setTimeout(loadMessages, 3000);
       }
     };
