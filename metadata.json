@@ -1,0 +1,8 @@
+{
+  "name": "Anvi & Zxhan's Private Hangout",
+  "description": "A feature-rich, private real-time hangout space with chat, collaborative drawing, synced music, and games, featuring an auto-delete system for privacy.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
