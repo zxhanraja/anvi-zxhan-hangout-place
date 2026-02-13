@@ -23,6 +23,9 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   const [input, setInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const recordingTimerRef = useRef<any>(null);
+  const isStartingRef = useRef(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,9 +71,18 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
         }
       });
 
+    const unsubChat = sync.subscribe('chat', (msg: Message) => {
+      console.log('Instant message received via Broadcast:', msg);
+      setMessages(prev => {
+        if (prev.find(m => m.id === msg.id)) return prev;
+        return [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
+      });
+    });
+
     return () => {
-      console.log('Unsubscribing from messages_channel');
+      console.log('Unsubscribing from channels');
       subscription.unsubscribe();
+      unsubChat();
     };
   }, []);
 
@@ -105,10 +117,10 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     if (image) type = 'image';
     if (audio) type = 'voice';
 
-    // Expiry: Voice 24h, Chat 48h, Image 12h
+    // Expiry: Voice 8h, Chat 48h, Image 12h
     let expiryHours = 48;
     if (type === 'image') expiryHours = 12;
-    if (type === 'voice') expiryHours = 24;
+    if (type === 'voice') expiryHours = 8;
 
     const msg: Message = {
       id: Math.random().toString(36).substr(2, 9),
@@ -123,7 +135,8 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
 
     setMessages(prev => [...prev, msg].sort((a, b) => a.timestamp - b.timestamp));
 
-    await sync.saveMessage(msg);
+    await sync.publish('chat', msg); // Instant broadcast
+    await sync.saveMessage(msg); // Persistent storage
     setInput('');
     setShowEmojiPicker(false);
 
@@ -161,14 +174,18 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   };
 
   const startRecording = async () => {
+    if (isRecording || isStartingRef.current) return;
     try {
+      isStartingRef.current = true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       const chunks: Blob[] = [];
 
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
+        if (blob.size < 1000) return; // Ignore very short taps
+
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = reader.result as string;
@@ -180,16 +197,41 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
+      setRecordingTime(0);
+      isStartingRef.current = false;
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          if (prev >= 300) { // 5 minutes limit
+            recorder.stop();
+            clearInterval(recordingTimerRef.current);
+            setIsRecording(false);
+            return 300;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
     } catch (e) {
+      isStartingRef.current = false;
       console.error('Microphone access denied', e);
-      alert('Microphone access required for Voice Notes.');
     }
   };
 
   const stopRecording = () => {
-    mediaRecorder?.stop();
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
     setIsRecording(false);
     setMediaRecorder(null);
+  };
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
@@ -357,15 +399,23 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
           <button onClick={() => fileInputRef.current?.click()} className="p-3 text-white/10 hover:text-white/40 transition-colors shrink-0"><ImageIcon className="w-5 h-5" /></button>
 
-          <button
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
-            className={`p-3 transition-all shrink-0 ${isRecording ? 'text-red-500 scale-110 animate-pulse' : 'text-white/10 hover:text-white/40'}`}
-          >
-            {isRecording ? <StopCircle className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
-          </button>
+          <div className="flex items-center gap-1 group relative">
+            {isRecording && (
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="absolute right-full mr-4 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 backdrop-blur-xl shrink-0 whitespace-nowrap">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black italic text-red-500 uppercase tracking-widest">{formatTime(recordingTime)} / 5:00</span>
+              </motion.div>
+            )}
+            <button
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
+              className={`p-3 transition-all shrink-0 ${isRecording ? 'text-red-500 scale-125' : 'text-white/10 hover:text-white/40'}`}
+            >
+              <Mic className={`w-5 h-5 ${isRecording ? 'animate-pulse' : ''}`} />
+            </button>
+          </div>
 
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`emoji-toggle-btn p-3 transition-colors shrink-0 ${showEmojiPicker ? 'text-white' : 'text-white/10 hover:text-white/40'}`}><Smile className="w-5 h-5" /></button>
           <input

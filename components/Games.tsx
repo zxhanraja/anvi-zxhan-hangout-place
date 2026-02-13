@@ -421,7 +421,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
           <div className="grid grid-cols-3 gap-2 md:gap-3 p-3 md:p-4 bg-white/[0.03] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] w-full aspect-square shadow-2xl relative">
             {board.map((cell, i) => {
               const myMarks = tttHistory.filter(h => h.symbol === (xIsNext ? 'X' : 'O'));
-              const isOldest = myMarks.length === 3 && myMarks[0].index === i;
+              const isOldest = myMarks.length === 3 && myMarks[0]?.index === i;
 
               return (
                 <button
