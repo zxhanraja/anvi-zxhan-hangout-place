@@ -10,10 +10,18 @@ import { Games } from './components/Games';
 import { Sidebar } from './components/Sidebar';
 import { Heart, ShieldCheck } from 'lucide-react';
 
+const IMAGES = {
+  Anvi: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg',
+  Zxhan: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg',
+  // Optimized versions
+  Anvi_Thumb: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg?tr=w-100,h-100,f-auto',
+  Zxhan_Thumb: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg?tr=w-100,h-100,f-auto',
+  Anvi_Login: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg?tr=w-400,h-600,f-auto',
+  Zxhan_Login: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg?tr=w-400,h-600,f-auto'
+};
+
 const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
-  const src = user === 'Anvi'
-    ? 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg'
-    : 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg';
+  const src = user === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb;
 
   return (
     <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500">
@@ -55,6 +63,53 @@ const App: React.FC = () => {
         setTimeout(() => setMissYouAlert(prev => prev.timestamp === data.timestamp ? { sender: null, timestamp: 0 } : prev), 4000);
       }
     });
+
+    // Initial presence fetch
+    supabase.from('presence').select('*').then(({ data }) => {
+      if (data) {
+        const p: any = {};
+        data.forEach((item: any) => {
+          p[item.user_id] = { user: item.user_id, isOnline: item.is_online };
+        });
+        setPresence(p);
+      }
+    });
+
+    // Heartbeat mechanism
+    let heartbeat: any;
+    if (user) {
+      sync.updatePresence(user, true); // Initial online status
+
+      heartbeat = setInterval(() => {
+        sync.updatePresence(user, true);
+      }, 30000); // 30 seconds heartbeat
+
+      // Handle visibility changes
+      const handleVisibility = () => {
+        if (document.hidden) {
+          sync.updatePresence(user, false);
+        } else {
+          sync.updatePresence(user, true);
+        }
+      };
+
+      // Handle window close
+      const handleUnload = () => {
+        sync.updatePresence(user, false);
+      };
+
+      document.addEventListener('visibilitychange', handleVisibility);
+      window.addEventListener('beforeunload', handleUnload);
+
+      return () => {
+        unsubTheme();
+        unsubPresence();
+        unsubMissYou();
+        clearInterval(heartbeat);
+        document.removeEventListener('visibilitychange', handleVisibility);
+        window.removeEventListener('beforeunload', handleUnload);
+      };
+    }
 
     return () => {
       unsubTheme();
@@ -142,7 +197,7 @@ const App: React.FC = () => {
             </div>
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
               <img
-                src={otherUser === 'Anvi' ? 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg' : 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg'}
+                src={otherUser === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb}
                 alt={otherUser}
                 className="w-full h-full object-cover grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all"
               />
@@ -228,13 +283,13 @@ const LoginScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =
 
         <LoginCard
           user="Anvi"
-          img="https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg"
+          img={IMAGES.Anvi_Login}
           onClick={() => onLogin('Anvi')}
           accent="#a855f7"
         />
         <LoginCard
           user="Zxhan"
-          img="https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg"
+          img={IMAGES.Zxhan_Login}
           onClick={() => onLogin('Zxhan')}
           accent="#3b82f6"
         />

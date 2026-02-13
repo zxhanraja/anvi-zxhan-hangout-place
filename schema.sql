@@ -54,15 +54,19 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 -- In a public app, you would restrict this to authenticated users.
 
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON public.messages;
 CREATE POLICY "Public Access" ON public.messages FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE public.sync_state ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON public.sync_state;
 CREATE POLICY "Public Access" ON public.sync_state FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE public.presence ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON public.presence;
 CREATE POLICY "Public Access" ON public.presence FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON public.notifications;
 CREATE POLICY "Public Access" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
 -- ==========================================
@@ -92,6 +96,13 @@ CREATE TRIGGER tr_clean_expired
   EXECUTE FUNCTION clean_expired_data();
 
 -- ==========================================
+-- ENABLE REALTIME
+-- ==========================================
+-- IMPORTANT: Run these to make sure sync works!
+alter publication supabase_realtime add table public.messages;
+alter publication supabase_realtime add table public.presence;
+alter publication supabase_realtime add table public.sync_state;
+
 -- VERCEL DEPLOYMENT NOTES
 -- ==========================================
 -- Add these to Vercel Environment Variables:

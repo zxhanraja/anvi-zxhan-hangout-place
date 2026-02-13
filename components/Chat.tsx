@@ -31,13 +31,25 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   const emojiPickerRef = useRef<HTMLDivElement>(null); // Ref for outside click
 
   useEffect(() => {
-    // Initial fetch from Supabase
-    sync.fetchMessages().then(setMessages);
+    // Initial fetch from Supabase with retry
+    const loadMessages = async () => {
+      try {
+        const msgs = await sync.fetchMessages();
+        setMessages(msgs);
+        console.log('Successfully fetched messages');
+      } catch (err) {
+        console.error('Failed to fetch messages, retrying...', err);
+        setTimeout(loadMessages, 3000);
+      }
+    };
+    loadMessages();
 
     // Subscribe to new messages from Supabase Realtime
+    console.log('Subscribing to messages_channel...');
     const subscription = supabase
       .channel('messages_channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        console.log('New message received via Realtime:', payload.new);
         const msg = payload.new as Message;
         setMessages(prev => {
           if (prev.find(m => m.id === msg.id)) return prev;
@@ -45,12 +57,19 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+        console.log('Message updated via Realtime:', payload.new);
         const updated = payload.new as Message;
         setMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime subscription failed. Ensure that "Realtime" is enabled for the "messages" table in Supabase.');
+        }
+      });
 
     return () => {
+      console.log('Unsubscribing from messages_channel');
       subscription.unsubscribe();
     };
   }, []);

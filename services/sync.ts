@@ -93,6 +93,26 @@ class SyncService {
     await supabase.from('notifications').insert([{ sender: from, recipient: to, type, timestamp: Date.now() }]);
   }
 
+  async updatePresence(user: string, isOnline: boolean) {
+    const data = { user, isOnline, lastSeen: Date.now() };
+
+    // Broadcast via ephemeral channel for immediate UI update
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'state_change',
+      payload: { type: 'presence', data },
+    });
+
+    // Also persist to DB so people joining later see it
+    if (navigator.onLine) {
+      await supabase.from('presence').upsert({
+        user_id: user,
+        is_online: isOnline,
+        last_seen: Date.now()
+      });
+    }
+  }
+
   async fetchNotifications(user: string) {
     const { data } = await supabase.from('notifications').select('*').eq('recipient', user).order('timestamp', { ascending: false });
     return data || [];
