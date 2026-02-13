@@ -80,6 +80,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
   }, [user]);
 
   const lastPos = useRef({ x: 0, y: 0 });
+  const lastSyncedPos = useRef({ x: 0, y: 0 });
   const lastSyncTime = useRef(0);
 
   const getPos = (e: any) => {
@@ -101,6 +102,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
       return;
     }
     lastPos.current = { x, y };
+    lastSyncedPos.current = { x, y }; // Initialize sync anchor
     setIsDrawing(true);
   };
 
@@ -131,19 +133,20 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     ctx.stroke();
 
     const now = Date.now();
-    if (now - lastSyncTime.current > 16) { // ~60fps throttling
+    if (now - lastSyncTime.current > 12) { // Smoother: ~80fps throttling
       sync.publish('drawing', {
         type: 'draw',
         user,
         x,
         y,
-        lastX: lastPos.current.x,
-        lastY: lastPos.current.y,
+        lastX: lastSyncedPos.current.x, // Use anchor from last successful sync
+        lastY: lastSyncedPos.current.y,
         color: tool === 'eraser' ? '#000000' : color,
         size,
         tool
       });
       lastSyncTime.current = now;
+      lastSyncedPos.current = { x, y }; // Only update anchor after sync
     }
     lastPos.current = { x, y };
   };

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const Games: React.FC<{ user: User }> = ({ user }) => {
   const [currentGame, setCurrentGame] = useState<'tictactoe' | 'connect4' | 'word' | 'truthordare' | 'reaction' | 'rps' | 'menu'>('menu');
   const [scores, setScores] = useState<Record<string, number>>({ Anvi: 0, Zxhan: 0 });
+  const [winner, setWinner] = useState<{ name: User; msg: string } | null>(null);
 
   // States
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
@@ -32,6 +33,8 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     });
 
     const unsub = sync.subscribe('game', (data: any) => {
+      if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
+      if (data.type === 'reset') { setWinner(null); }
       if (data.type === 'tictactoe') {
         setBoard(data.board);
         setXIsNext(data.xIsNext);
@@ -43,6 +46,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       if (data.type === 'truthordare') { setTdActive(data.active); setCurrentGame('truthordare'); }
       if (data.type === 'reaction') { setReactionState(data.state); setCurrentGame('reaction'); }
       if (data.type === 'rps') { setRpsState(data.state); setCurrentGame('rps'); }
+      if (data.type === 'win') { setWinner(data.winner); }
     });
 
     const unsubScores = sync.subscribe('scores', (data: any) => {
@@ -55,8 +59,22 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     };
   }, []);
 
-  const handleWin = (winner: 'Anvi') => {
-    sync.updateScore('Anvi', 1);
+  const handleWin = (w: User) => {
+    const winData = { name: w, msg: `${w} WON` };
+    setWinner(winData);
+    sync.updateScore(w, 1);
+    sync.publish('game', { type: 'win', winner: winData });
+  };
+
+  const switchGame = (game: typeof currentGame) => {
+    setCurrentGame(game);
+    setWinner(null);
+    sync.publish('game', { type: 'switch', game });
+  };
+
+  const resetGame = () => {
+    setWinner(null);
+    sync.publish('game', { type: 'reset' });
   };
 
   const handleTTTClick = (i: number) => {
@@ -82,7 +100,8 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       sync.publish('game', { type: 'tictactoe', board: nextBoard, xIsNext: !xIsNext, history: finalHistory });
 
       const winner = calculateTTTWinner(nextBoard);
-      if (winner === 'O') handleWin('Anvi'); // Anvi wins (Zxhan loses)
+      if (winner === 'X') handleWin('Zxhan');
+      if (winner === 'O') handleWin('Anvi');
     } else {
       nextBoard[i] = symbol;
       setBoard(nextBoard);
@@ -91,21 +110,31 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       sync.publish('game', { type: 'tictactoe', board: nextBoard, xIsNext: !xIsNext, history: nextHistory });
 
       const winner = calculateTTTWinner(nextBoard);
+      if (winner === 'X') handleWin('Zxhan');
       if (winner === 'O') handleWin('Anvi');
     }
   };
 
   const handleC4Click = (colIndex: number) => {
-    if (c4Turn !== user) return;
+    if (c4Turn !== user || winner) return;
     const nextBoard = c4Board.map(row => [...row]);
-    let placed = false;
-    for (let r = 5; r >= 0; r--) { if (!nextBoard[r][colIndex]) { nextBoard[r][colIndex] = user; placed = true; break; } }
-    if (!placed) return;
+    let placedRow = -1;
+    for (let r = 5; r >= 0; r--) {
+      if (!nextBoard[r][colIndex]) {
+        nextBoard[r][colIndex] = user;
+        placedRow = r;
+        break;
+      }
+    }
+    if (placedRow === -1) return;
     const nextTurn = user === 'Anvi' ? 'Zxhan' : 'Anvi';
-    setC4Board(nextBoard); setC4Turn(nextTurn);
+    setC4Board(nextBoard);
+    setC4Turn(nextTurn);
     sync.publish('game', { type: 'connect4', board: nextBoard, turn: nextTurn });
 
-    // Winner check simplified forConnect 4 (omitted for brevity in this specific task but would call handleWin)
+    if (checkC4Winner(nextBoard, placedRow, colIndex)) {
+      handleWin(user);
+    }
   };
 
   const handleRPS = (move: string) => {
@@ -121,7 +150,37 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const HANGMAN_WORDS = ['AESTHETIC', 'CYBERPUNK', 'METAVERSE', 'BLOCKCHAIN', 'ALGORITHM', 'SYMPHONY', 'EUPHORIA', 'NOSTALGIA', 'ETHEREAL', 'PHANTOM', 'QUARTZ', 'ZODIAC', 'VELOCITY', 'ZENITH', 'OBLIVION', 'SERENDIPITY'];
+  const handleReactionClick = () => {
+    if (reactionState.status !== 'ready' || winner) return;
+    const time = Date.now() - reactionState.startTime;
+    const nextState = { ...reactionState, status: 'finished', scores: { ...reactionState.scores, [user]: time } };
+    setReactionState(nextState);
+    sync.publish('game', { type: 'reaction', state: nextState });
+
+    // Check if both played
+    const other = user === 'Anvi' ? 'Zxhan' : 'Anvi';
+    if (nextState.scores[other]) {
+      const myTime = time;
+      const otherTime = nextState.scores[other];
+      if (myTime < otherTime) handleWin(user);
+      else handleWin(other);
+    }
+  };
+
+  const startReactionGame = () => {
+    const delay = Math.random() * 2000 + 1000; // Harder: 1-3 seconds
+    const state = { status: 'waiting', startTime: 0, scores: {} };
+    setReactionState(state);
+    sync.publish('game', { type: 'reaction', state });
+
+    setTimeout(() => {
+      const readyState = { status: 'ready', startTime: Date.now(), scores: {} };
+      setReactionState(readyState);
+      sync.publish('game', { type: 'reaction', state: readyState });
+    }, delay);
+  };
+
+  const HANGMAN_WORDS = ['EPHEMERAL', 'QUINTESSENTIAL', 'RENAISSANCE', 'LABYRINTH', 'PARADIGM', 'JUXTAPOSITION', 'MELLIFLUOUS', 'SYCOPHANT', 'ZEITGEIST', 'OSCILLATE', 'CACOPHONY', 'QUixOTIC', 'NEBULOUS', 'PETRICHOR', 'HALCYON', 'SERENDIPITY'];
 
   const handleWordSet = () => {
     if (!wordInput.trim()) return;
@@ -175,7 +234,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
             { id: 'reaction', icon: Zap, name: 'BLITZ', desc: 'REACTION' },
             { id: 'truthordare', icon: Flame, name: 'FLAME', desc: 'T OR D' },
           ].map((game) => (
-            <motion.button key={game.id} whileHover={{ y: -5, scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setCurrentGame(game.id as any)} className="p-6 md:p-8 bg-white/[0.03] border border-white/[0.06] rounded-[2rem] md:rounded-[2.5rem] hover:bg-white hover:text-black transition-all group flex items-center gap-4 md:gap-6 text-left shadow-2xl">
+            <motion.button key={game.id} whileHover={{ y: -5, scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => switchGame(game.id as any)} className="p-6 md:p-8 bg-white/[0.03] border border-white/[0.06] rounded-[2rem] md:rounded-[2.5rem] hover:bg-white hover:text-black transition-all group flex items-center gap-4 md:gap-6 text-left shadow-2xl">
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/5 group-hover:bg-black/5 flex items-center justify-center shrink-0 transition-colors text-white group-hover:text-black">
                 <game.icon className="w-6 h-6 md:w-8 md:h-8 shrink-0" />
               </div>
@@ -194,48 +253,39 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     <div className="h-full flex flex-col items-center p-4 md:p-6 bg-black relative overflow-y-auto no-scrollbar">
       <button onClick={() => setCurrentGame('menu')} className="fixed top-4 left-4 md:top-8 md:left-8 px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest z-[150] shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
 
-      {currentGame === 'rps' && (
-        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-md pb-40 px-4">
-          <div className="text-center space-y-2">
-            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">CLASH PRO</h3>
-            <p className="text-[7px] md:text-[8px] font-bold opacity-30 uppercase tracking-[0.4em]">ROCK PAPER SCISSORS LIZARD SPOCK</p>
+      {currentGame === 'connect4' && (
+        <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-lg pb-40 px-4">
+          <div className="text-center space-y-2 mb-4">
+            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">GRAVITY CORE</h3>
+            <p className="text-[7px] md:text-[8px] font-bold text-blue-500 uppercase tracking-[0.4em]">4 IN A ROW TO CONQUER</p>
           </div>
-          <div className="flex justify-between w-full mb-4 px-4 md:px-8">
-            <div className="flex flex-col items-center gap-3">
-              <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Anvi ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
-                {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Anvi) : (rpsState.Anvi ? '✅' : '?')}
-              </div>
-              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ANVI</span>
-            </div>
-            <div className="flex flex-col items-center gap-3">
-              <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Zxhan ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
-                {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
-              </div>
-              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ZXHAN</span>
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-3 h-3 rounded-full ${c4Turn === 'Anvi' ? 'bg-purple-500 animate-pulse' : 'bg-white/10'}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest italic">{c4Turn}'S TURN</span>
+            <div className={`w-3 h-3 rounded-full ${c4Turn === 'Zxhan' ? 'bg-blue-500 animate-pulse' : 'bg-white/10'}`} />
+          </div>
+          <div className="bg-blue-600/20 p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-blue-500/30 shadow-[0_0_50px_rgba(37,99,235,0.2)]">
+            <div className="grid grid-cols-7 gap-2 md:gap-3">
+              {c4Board[0].map((_, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-2 md:gap-3">
+                  {[0, 1, 2, 3, 4, 5].map(rowIndex => {
+                    const cell = c4Board[rowIndex][colIndex];
+                    return (
+                      <button
+                        key={rowIndex}
+                        onClick={() => handleC4Click(colIndex)}
+                        className={`w-10 h-10 md:w-14 md:h-14 rounded-full border border-white/5 transition-all flex items-center justify-center
+                          ${!cell ? 'bg-black/40 hover:bg-black/60' : (cell === 'Anvi' ? 'bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]')}
+                        `}
+                      >
+                        {cell && <div className="w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-white/20" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
-
-          <div className="grid grid-cols-5 gap-1.5 md:gap-2 w-full">
-            {[
-              { id: 'rock', glyph: '✊', label: 'ROCK' },
-              { id: 'paper', glyph: '✋', label: 'PAPER' },
-              { id: 'scissors', glyph: '✌️', label: 'SCISSORS' },
-              { id: 'lizard', glyph: '🦎', label: 'LIZARD' },
-              { id: 'spock', glyph: '🖖', label: 'SPOCK' }
-            ].map(m => (
-              <button key={m.id} disabled={!!rpsState[user]} onClick={() => handleRPS(m.id)} className={`p-3 md:p-4 bg-white/5 border border-white/10 rounded-xl md:rounded-2xl flex flex-col items-center gap-1 md:gap-2 transition-all ${rpsState[user] === m.id ? 'bg-white text-black' : 'hover:bg-white/10 opacity-40 hover:opacity-100'}`}>
-                <span className="text-lg md:text-xl">{m.glyph}</span>
-                <span className="text-[6px] md:text-[7px] font-black uppercase italic">{m.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {rpsState.Anvi && rpsState.Zxhan && (
-            <div className="flex flex-col items-center gap-4 md:gap-6">
-              <div className="text-lg md:text-xl font-black italic uppercase tracking-widest text-[var(--accent)]">{getRPSResult(rpsState.Anvi, rpsState.Zxhan)}</div>
-              <button onClick={() => { const s = { Anvi: null, Zxhan: null }; setRpsState(s); sync.publish('game', { type: 'rps', state: s }); }} className="px-10 md:px-12 py-4 md:py-5 bg-white text-black rounded-full font-black uppercase italic tracking-tighter text-xs md:text-sm shadow-2xl">PLAY AGAIN</button>
-            </div>
-          )}
         </div>
       )}
 
@@ -285,36 +335,175 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
-      {currentGame === 'tictactoe' && (
-        <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-md pb-40">
-          <div className="text-center space-y-2 mb-4">
-            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">INFINITY TACTICS</h3>
-            <p className="text-[7px] md:text-[8px] font-bold text-[var(--accent)] uppercase tracking-[0.4em]">ONLY 3 MARKS ALLOWED // NO DRAWS POSSIBLE</p>
+      {currentGame === 'rps' && (
+        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-md pb-40 px-4">
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">CLASH PRO</h3>
+            <p className="text-[7px] md:text-[8px] font-bold opacity-30 uppercase tracking-[0.4em]">ROCK PAPER SCISSORS LIZARD SPOCK</p>
           </div>
-          <h3 className="text-lg md:text-xl font-black italic uppercase tracking-tighter">{calculateTTTWinner(board) ? (calculateTTTWinner(board) === 'DRAW' ? "DRAW" : `${calculateTTTWinner(board)} WINS`) : `${xIsNext ? 'X' : 'O'} TURN`}</h3>
-          <div className="grid grid-cols-3 gap-2 md:gap-3 p-3 md:p-4 bg-white/[0.03] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] w-full aspect-square shadow-2xl relative">
-            {board.map((cell, i) => {
-              const myMarks = tttHistory.filter(h => h.symbol === (xIsNext ? 'X' : 'O'));
-              const isOldest = myMarks.length === 3 && myMarks[0].index === i;
+          <div className="flex justify-between w-full mb-4 px-4 md:px-8">
+            <div className="flex flex-col items-center gap-3">
+              <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Anvi ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
+                {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Anvi) : (rpsState.Anvi ? '✅' : '?')}
+              </div>
+              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ANVI</span>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Zxhan ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
+                {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
+              </div>
+              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ZXHAN</span>
+            </div>
+          </div>
 
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleTTTClick(i)}
-                  className={`bg-[#0a0a0a] border border-white/5 rounded-2xl md:rounded-3xl text-4xl md:text-5xl font-display font-black flex items-center justify-center hover:border-white/20 transition-all active:scale-90 shadow-inner relative overflow-hidden ${isOldest ? 'opacity-30' : ''}`}
-                >
-                  {cell}
-                  {isOldest && <div className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none" />}
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-5 gap-1.5 md:gap-2 w-full">
+            {[
+              { id: 'rock', glyph: '✊', label: 'ROCK' },
+              { id: 'paper', glyph: '✋', label: 'PAPER' },
+              { id: 'scissors', glyph: '✌️', label: 'SCISSORS' },
+              { id: 'lizard', glyph: '🦎', label: 'LIZARD' },
+              { id: 'spock', glyph: '🖖', label: 'SPOCK' }
+            ].map(m => (
+              <button key={m.id} disabled={!!rpsState[user] || !!winner} onClick={() => handleRPS(m.id)} className={`p-3 md:p-4 bg-white/5 border border-white/10 rounded-xl md:rounded-2xl flex flex-col items-center gap-1 md:gap-2 transition-all ${rpsState[user] === m.id ? 'bg-white text-black' : 'hover:bg-white/10 opacity-40 hover:opacity-100'}`}>
+                <span className="text-lg md:text-xl">{m.glyph}</span>
+                <span className="text-[6px] md:text-[7px] font-black uppercase italic">{m.label}</span>
+              </button>
+            ))}
           </div>
-          <button onClick={() => { setBoard(Array(9).fill(null)); setXIsNext(true); setTttHistory([]); sync.publish('game', { type: 'tictactoe', board: Array(9).fill(null), xIsNext: true, history: [] }); }} className="px-8 md:px-10 py-3 md:py-4 bg-white text-black rounded-full font-black uppercase italic text-[8px] md:text-[10px] tracking-widest">RESET</button>
         </div>
       )}
+
+      {currentGame === 'reaction' && (
+        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-md pb-40 px-4">
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">BLITZ REACTION</h3>
+            <p className="text-[7px] md:text-[8px] font-bold opacity-30 uppercase tracking-[0.4em]">CLICK FAST WHEN IT TURNS GREEN</p>
+          </div>
+
+          <button
+            onClick={handleReactionClick}
+            disabled={reactionState.status === 'finished' || winner}
+            className={`w-full aspect-square rounded-[3rem] border-8 transition-all duration-75 flex flex-col items-center justify-center gap-4 shadow-2xl
+              ${reactionState.status === 'waiting' ? 'bg-red-500/10 border-red-500/20' : ''}
+              ${reactionState.status === 'ready' ? 'bg-green-500 border-green-400 scale-105 shadow-[0_0_50px_rgba(34,197,94,0.4)]' : ''}
+              ${reactionState.status === 'finished' ? 'bg-white/5 border-white/10' : ''}
+            `}
+          >
+            {reactionState.status === 'waiting' && <span className="text-2xl font-black italic animate-pulse">WAIT...</span>}
+            {reactionState.status === 'ready' && <span className="text-4xl font-black italic text-black animate-bounce">HIT!</span>}
+            {reactionState.status === 'finished' && (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-4xl font-black italic">{reactionState.scores[user] || '---'}ms</span>
+                <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">YOUR TIME</span>
+              </div>
+            )}
+          </button>
+
+          {reactionState.status === 'finished' && reactionState.scores[user] && (
+            <div className="flex flex-col items-center gap-2 animate-in fade-in slide-in-from-bottom-4">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-30 italic">WAITING FOR OTHER PLAYER...</span>
+            </div>
+          )}
+
+          {reactionState.status !== 'waiting' && reactionState.status !== 'ready' && (
+            <button onClick={startReactionGame} className="px-12 py-5 bg-white text-black rounded-full font-black uppercase italic tracking-widest text-xs hover:scale-105 transition-transform shadow-2xl">START BLITZ</button>
+          )}
+        </div>
+      )}
+
+      {currentGame === 'truthordare' && (
+        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-lg pb-40 px-4">
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">FLAME DUEL</h3>
+            <p className="text-[7px] md:text-[8px] font-bold text-orange-500 uppercase tracking-[0.4em]">EXTREME TRUTH OR DARE</p>
+          </div>
+
+          <div className="w-full flex flex-col gap-4">
+            {tdActive.type ? (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-10 md:p-16 bg-white/[0.03] border border-white/10 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
+                <div className={`absolute top-0 left-0 right-0 h-2 ${tdActive.type === 'truth' ? 'bg-blue-500' : 'bg-orange-500'}`} />
+                <span className={`text-[10px] font-black uppercase tracking-[0.5em] mb-4 block ${tdActive.type === 'truth' ? 'text-blue-500' : 'text-orange-500'}`}>{tdActive.type}</span>
+                <p className="text-xl md:text-3xl font-black italic uppercase tracking-tighter leading-tight">{tdActive.content}</p>
+                <button onClick={() => { const a = { type: '', content: '' }; setTdActive(a as any); sync.publish('game', { type: 'truthordare', active: a }); }} className="mt-12 px-8 py-3 bg-white/5 hover:bg-white/10 rounded-full font-black uppercase text-[8px] tracking-widest transition-all">NEXT ROUND</button>
+              </motion.div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 md:gap-6">
+                <button onClick={() => {
+                  const truths = ["Who was your first crush?", "What's the biggest lie you've told me?", "What's your biggest insecurity?", "If you could change one thing about yourself, what would it be?", "What's the most embarrassing thing you've ever done?", "What is one thing you're glad your parents don't know?", "What's the most useless thing you've ever bought?"];
+                  const t = { type: 'truth', content: truths[Math.floor(Math.random() * truths.length)] };
+                  setTdActive(t as any); sync.publish('game', { type: 'truthordare', active: t });
+                }} className="p-8 md:p-12 bg-blue-500/10 border border-blue-500/20 rounded-[2.5rem] hover:bg-blue-500 hover:text-black transition-all group flex flex-col items-center gap-4">
+                  <HelpCircle className="w-10 h-10 group-hover:scale-110 transition-transform" />
+                  <span className="font-black italic uppercase tracking-tighter text-2xl">TRUTH</span>
+                </button>
+                <button onClick={() => {
+                  const dares = ["Post a screenshot of our chat (don't).", "Sing a song chosen by me for 1 minute.", "Send me the 5th photo in your gallery.", "Do 20 pushups while saying my name.", "Try to juggle 3 random items.", "Speak in an accent for the next 10 minutes.", "Dance without music for 2 minutes."];
+                  const d = { type: 'dare', content: dares[Math.floor(Math.random() * dares.length)] };
+                  setTdActive(d as any); sync.publish('game', { type: 'truthordare', active: d });
+                }} className="p-8 md:p-12 bg-orange-500/10 border border-orange-500/20 rounded-[2.5rem] hover:bg-orange-500 hover:text-black transition-all group flex flex-col items-center gap-4">
+                  <Flame className="w-10 h-10 group-hover:scale-110 transition-transform" />
+                  <span className="font-black italic uppercase tracking-tighter text-2xl">DARE</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {winner && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-xl p-6">
+            <motion.div initial={{ scale: 0.8, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#0a0a0a] border border-white/10 p-10 md:p-16 rounded-[3rem] text-center shadow-[0_0_100px_rgba(255,255,255,0.1)] flex flex-col items-center gap-8 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+              <div className="relative">
+                <div className="absolute inset-0 blur-3xl bg-white/20 animate-pulse" />
+                <h2 className="text-5xl md:text-7xl font-display font-black italic uppercase tracking-tighter text-white relative z-10">{winner.msg}</h2>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-white/30">Match Concluded</p>
+              <button
+                onClick={() => {
+                  if (currentGame === 'tictactoe') { setBoard(Array(9).fill(null)); setTttHistory([]); sync.publish('game', { type: 'tictactoe', board: Array(9).fill(null), xIsNext: true, history: [] }); }
+                  if (currentGame === 'rps') { setRpsState({ Anvi: null, Zxhan: null }); sync.publish('game', { type: 'rps', state: { Anvi: null, Zxhan: null } }); }
+                  if (currentGame === 'connect4') { setC4Board(Array(6).fill(null).map(() => Array(7).fill(null))); sync.publish('game', { type: 'connect4', board: Array(6).fill(null).map(() => Array(7).fill(null)), turn: 'Anvi' }); }
+                  if (currentGame === 'word') { setWordState({ word: '', guesses: [], setter: '', status: 'setting' }); sync.publish('game', { type: 'word', state: { word: '', guesses: [], setter: '', status: 'setting' } }); }
+                  if (currentGame === 'reaction') { setReactionState({ status: 'waiting', startTime: 0, scores: {} }); sync.publish('game', { type: 'reaction', state: { status: 'waiting', startTime: 0, scores: {} } }); }
+                  resetGame();
+                }}
+                className="px-12 py-5 bg-white text-black rounded-full font-black uppercase italic tracking-widest text-xs hover:scale-105 transition-transform shadow-2xl"
+              >
+                RE-MATCH
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+function checkC4Winner(board: (string | null)[][], row: number, col: number) {
+  const symbol = board[row][col];
+  if (!symbol) return false;
+
+  const check = (dr: number, dc: number) => {
+    let count = 1;
+    for (let i = 1; i < 4; i++) {
+      const r = row + dr * i;
+      const c = col + dc * i;
+      if (r >= 0 && r < 6 && c >= 0 && c < 7 && board[r][c] === symbol) count++;
+      else break;
+    }
+    for (let i = 1; i < 4; i++) {
+      const r = row - dr * i;
+      const c = col - dc * i;
+      if (r >= 0 && r < 6 && c >= 0 && c < 7 && board[r][c] === symbol) count++;
+      else break;
+    }
+    return count >= 4;
+  };
+
+  return check(0, 1) || check(1, 0) || check(1, 1) || check(1, -1);
+}
 
 function calculateTTTWinner(squares: (string | null)[]) {
   const lines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
