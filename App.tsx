@@ -50,6 +50,24 @@ const App: React.FC = () => {
       localStorage.setItem('theme_accent', data.accent);
     });
 
+    const unsubPresenceSync = sync.subscribe('presence_sync', (state: any) => {
+      setPresence((prev: any) => {
+        const p: any = { ...prev };
+        Object.keys(state).forEach(key => {
+          const presenceEntry = state[key][0];
+          if (presenceEntry) {
+            p[presenceEntry.user] = {
+              user: presenceEntry.user,
+              isOnline: presenceEntry.status === 'online',
+              status: presenceEntry.status,
+              lastSeen: Date.now()
+            };
+          }
+        });
+        return p;
+      });
+    });
+
     const unsubPresence = sync.subscribe('presence', (data: any) => {
       setPresence((prev: any) => ({ ...prev, [data.user]: data }));
     });
@@ -61,7 +79,7 @@ const App: React.FC = () => {
       }
     });
 
-    // Initial presence fetch
+    // Initial presence fetch from DB (fallback)
     supabase.from('presence').select('*').then(({ data }) => {
       if (data) {
         const p: any = {};
@@ -72,49 +90,35 @@ const App: React.FC = () => {
       }
     });
 
-    // Heartbeat mechanism for Presence
-    let heartbeat: any;
     let inactivityTimer: any;
-    const lastSentStatus = { current: '' };
 
     if (user) {
       const updateClientPresence = (u: string, s: string) => {
         const isOnline = s === 'online';
         const data = { user: u, isOnline, status: s, lastSeen: Date.now() };
 
-        // Update local state immediately for instant feedback
+        // Update local state and broadcast
         setPresence((prev: any) => ({ ...prev, [u]: data }));
-
-        // Only publish if status actually changed to avoid channel flood
-        if (lastSentStatus.current !== s) {
-          sync.updatePresence(u, s as any);
-          lastSentStatus.current = s;
-        }
+        sync.updatePresence(u, s as any);
       };
 
       const resetInactivity = () => {
         clearTimeout(inactivityTimer);
         // If we were away or offline, set back to online
-        if (lastSentStatus.current !== 'online') {
+        if (presence[user]?.status !== 'online') {
           updateClientPresence(user, 'online');
         }
         inactivityTimer = setTimeout(() => {
           updateClientPresence(user, 'away');
-        }, 15000); // Increased to 15 seconds for away
+        }, 30000); // 30 seconds for away
       };
 
       // Initial online status
       updateClientPresence(user, 'online');
       resetInactivity();
 
-      heartbeat = setInterval(() => {
-        // Heartbeat FORCE update every 10s to keep DB fresh, even if status same
-        sync.updatePresence(user, lastSentStatus.current as any);
-      }, 10000);
-
       const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
       const throttledReset = () => {
-        // Only reset if we've moved significantly or haven't reset in a while
         resetInactivity();
       };
 
@@ -139,10 +143,10 @@ const App: React.FC = () => {
       return () => {
         unsubTheme();
         unsubPresence();
+        unsubPresenceSync();
         unsubMissYou();
-        clearInterval(heartbeat);
         clearTimeout(inactivityTimer);
-        events.forEach(e => window.removeEventListener(e, resetInactivity));
+        events.forEach(e => window.removeEventListener(e, throttledReset));
         window.removeEventListener('beforeunload', handleUnload);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };

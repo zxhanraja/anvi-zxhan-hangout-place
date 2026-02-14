@@ -19,6 +19,12 @@ class SyncService {
     this.channel = supabase.channel('hangout_sync');
 
     this.channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = this.channel.presenceState();
+        if (this.listeners['presence_sync']) {
+          this.listeners['presence_sync'].forEach(cb => cb(state));
+        }
+      })
       .on('broadcast', { event: 'state_change' }, (payload: any) => {
         const { type, data } = payload;
         if (this.listeners[type]) {
@@ -38,6 +44,16 @@ class SyncService {
     window.addEventListener('online', () => this.processOfflineQueue());
   }
 
+  async trackUser(user: string, status: 'online' | 'away' | 'offline') {
+    if (this.channel) {
+      await this.channel.track({
+        user,
+        status,
+        online_at: new Date().toISOString(),
+      });
+    }
+  }
+
   subscribe(type: string, callback: Function) {
     if (!this.listeners[type]) this.listeners[type] = [];
     this.listeners[type].push(callback);
@@ -47,12 +63,7 @@ class SyncService {
   }
 
   async publish(type: string, data: any) {
-    if (!navigator.onLine) {
-      // We only queue generic broadcast events if critical, but 'publish' is mostly for ephemeral sync (music/theme).
-      // However, the user wants music/theme sync to work when "he comes online". Realtime is ephemeral.
-      // We should save to DB for persistence if it's music/theme.
-    }
-
+    // For high-frequency data like drawing, we use broadcast directly
     await this.channel.send({
       type: 'broadcast',
       event: 'state_change',
@@ -62,11 +73,6 @@ class SyncService {
     // Also save to a central state table for persistence
     if (type === 'theme' || type === 'music') {
       const { error } = await supabase.from('sync_state').upsert({ key: type, data });
-      if (error && !navigator.onLine) {
-        // Queue DB update?
-        // For now, simpler to just rely on re-try or next action. 
-        // BUT for Messages, we MUST queue.
-      }
     }
   }
 
@@ -139,7 +145,10 @@ class SyncService {
     const isOnline = status === 'online';
     const data = { user, isOnline, status, lastSeen: Date.now() };
 
-    // Broadcast via ephemeral channel for immediate UI update
+    // Use built-in tracking for state sync
+    await this.trackUser(user, status);
+
+    // Broadcast via ephemeral channel for immediate UI update (keeping old way for legacy compat if needed)
     await this.channel.send({
       type: 'broadcast',
       event: 'state_change',

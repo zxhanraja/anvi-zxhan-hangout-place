@@ -152,8 +152,8 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     ctx.stroke();
 
     const now = Date.now();
-    // Broadcast for immediate sync (approx 60fps)
-    if (now - lastSyncTime.current > 16) {
+    // Broadcast for immediate sync (approx 60fps) - reduced to 12ms for even smoother real-time
+    if (now - lastSyncTime.current > 12) {
       const width = canvasRef.current!.width;
       const height = canvasRef.current!.height;
 
