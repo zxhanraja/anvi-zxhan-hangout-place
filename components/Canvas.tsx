@@ -134,17 +134,18 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     const now = Date.now();
     if (now - lastSyncTime.current > 12) { // Smoother: ~80fps throttling
-      sync.publish('drawing', {
+      const payload = {
         type: 'draw',
         user,
         x,
         y,
-        lastX: lastSyncedPos.current.x, // Use anchor from last successful sync
+        lastX: lastSyncedPos.current.x,
         lastY: lastSyncedPos.current.y,
         color: tool === 'eraser' ? '#000000' : color,
         size,
         tool
-      });
+      };
+      sync.publish('drawing', payload);
       lastSyncTime.current = now;
       lastSyncedPos.current = { x, y }; // Only update anchor after sync
     }

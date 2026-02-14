@@ -20,7 +20,7 @@ class SyncService {
 
     this.channel
       .on('broadcast', { event: 'state_change' }, (payload: any) => {
-        const { type, data } = payload.payload;
+        const { type, data } = payload;
         if (this.listeners[type]) {
           this.listeners[type].forEach(cb => cb(data));
         }
@@ -29,6 +29,8 @@ class SyncService {
         if (status === 'SUBSCRIBED') {
           console.log('Connected to Realtime Sync');
           this.processOfflineQueue();
+        } else {
+          console.warn('Realtime Sync Status:', status);
         }
       });
 
