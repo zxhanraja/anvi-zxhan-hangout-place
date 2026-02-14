@@ -99,6 +99,7 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
 
     const unsubChat = sync.subscribe('chat', (msg: Message) => {
       console.log('Instant message received via Broadcast:', msg);
+      if (msg.sender === user) return; // Fix: Don't process our own broadcast
       setMessages(prev => {
         if (prev.find(m => m.id === msg.id)) return prev;
         return [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);

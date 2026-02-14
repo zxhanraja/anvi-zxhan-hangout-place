@@ -53,6 +53,10 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     const unsubDrawing = sync.subscribe('drawing', (action: any) => {
       if (action.user === user) return;
+
+      const width = canvas.width;
+      const height = canvas.height;
+
       if (action.type === 'draw') {
         ctx.beginPath();
         ctx.strokeStyle = action.color;
@@ -60,14 +64,14 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.globalAlpha = action.tool === 'brush' ? 0.2 : 1.0;
-        ctx.moveTo(action.lastX, action.lastY);
-        ctx.lineTo(action.x, action.y);
+        ctx.moveTo(action.lastX * width, action.lastY * height);
+        ctx.lineTo(action.x * width, action.y * height);
         ctx.stroke();
       } else if (action.type === 'stamp') {
         ctx.font = `${action.size * 4}px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(action.emoji, action.x, action.y);
+        ctx.fillText(action.emoji, action.x * width, action.y * height);
       } else if (action.type === 'clear') {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
@@ -92,13 +96,16 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
   const start = (e: any) => {
     const { x, y } = getPos(e);
+    const width = canvasRef.current!.width;
+    const height = canvasRef.current!.height;
+
     if (tool === 'stamp') {
       const ctx = canvasRef.current!.getContext('2d')!;
       ctx.font = `${size * 4}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(activeEmoji, x, y);
-      sync.publish('drawing', { type: 'stamp', user, x, y, emoji: activeEmoji, size });
+      sync.publish('drawing', { type: 'stamp', user, x: x / width, y: y / height, emoji: activeEmoji, size });
       return;
     }
     lastPos.current = { x, y };
@@ -134,13 +141,16 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     const now = Date.now();
     if (now - lastSyncTime.current > 12) { // Smoother: ~80fps throttling
+      const width = canvasRef.current!.width;
+      const height = canvasRef.current!.height;
+
       const payload = {
         type: 'draw',
         user,
-        x,
-        y,
-        lastX: lastSyncedPos.current.x,
-        lastY: lastSyncedPos.current.y,
+        x: x / width,
+        y: y / height,
+        lastX: lastSyncedPos.current.x / width,
+        lastY: lastSyncedPos.current.y / height,
         color: tool === 'eraser' ? '#000000' : color,
         size,
         tool

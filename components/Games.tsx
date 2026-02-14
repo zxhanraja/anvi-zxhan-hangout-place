@@ -24,6 +24,9 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   // TTT Infinity Logic: Track [ { index, symbol } ]
   const [tttHistory, setTttHistory] = useState<{ index: number; symbol: string }[]>([]);
 
+  // Turn management for fair chances
+  const [startingPlayer, setStartingPlayer] = useState<User>('Zxhan');
+
   useEffect(() => {
     // Initial fetch
     sync.fetchScores().then(data => {
@@ -34,7 +37,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
     const unsub = sync.subscribe('game', (data: any) => {
       if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
-      if (data.type === 'reset') { setWinner(null); }
+      if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
       if (data.type === 'tictactoe') {
         setBoard(data.board);
         setXIsNext(data.xIsNext);
@@ -74,7 +77,9 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
   const resetGame = () => {
     setWinner(null);
-    sync.publish('game', { type: 'reset' });
+    const nextStarting = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+    setStartingPlayer(nextStarting);
+    sync.publish('game', { type: 'reset', startingPlayer: nextStarting });
   };
 
   const handleTTTClick = (i: number) => {
@@ -506,9 +511,27 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
               <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-white/30">Match Concluded</p>
               <button
                 onClick={() => {
-                  if (currentGame === 'tictactoe') { setBoard(Array(9).fill(null)); setTttHistory([]); sync.publish('game', { type: 'tictactoe', board: Array(9).fill(null), xIsNext: true, history: [] }); }
+                  if (currentGame === 'tictactoe') {
+                    const nextStart = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+                    const nextBoard = Array(9).fill(null);
+                    setBoard(nextBoard);
+                    setTttHistory([]);
+                    setXIsNext(nextStart === 'Zxhan');
+                    sync.publish('game', {
+                      type: 'tictactoe',
+                      board: nextBoard,
+                      xIsNext: nextStart === 'Zxhan',
+                      history: []
+                    });
+                  }
                   if (currentGame === 'rps') { setRpsState({ Anvi: null, Zxhan: null }); sync.publish('game', { type: 'rps', state: { Anvi: null, Zxhan: null } }); }
-                  if (currentGame === 'connect4') { setC4Board(Array(6).fill(null).map(() => Array(7).fill(null))); sync.publish('game', { type: 'connect4', board: Array(6).fill(null).map(() => Array(7).fill(null)), turn: 'Anvi' }); }
+                  if (currentGame === 'connect4') {
+                    const nextStart = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+                    const nextBoard = Array(6).fill(null).map(() => Array(7).fill(null));
+                    setC4Board(nextBoard);
+                    setC4Turn(nextStart);
+                    sync.publish('game', { type: 'connect4', board: nextBoard, turn: nextStart });
+                  }
                   if (currentGame === 'word') { setWordState({ word: '', guesses: [], setter: '', status: 'setting' }); sync.publish('game', { type: 'word', state: { word: '', guesses: [], setter: '', status: 'setting' } }); }
                   if (currentGame === 'reaction') { setReactionState({ status: 'waiting', startTime: 0, scores: {} }); sync.publish('game', { type: 'reaction', state: { status: 'waiting', startTime: 0, scores: {} } }); }
                   resetGame();

@@ -80,7 +80,7 @@ const App: React.FC = () => {
 
       heartbeat = setInterval(() => {
         sync.updatePresence(user, true);
-      }, 10000); // 10 seconds heartbeat for better accuracy
+      }, 5000); // 5 seconds heartbeat for better accuracy
 
       // Monitor "Last Seen" for others every 5s
       const presenceInterval = setInterval(() => {
@@ -88,8 +88,8 @@ const App: React.FC = () => {
           const now = Date.now();
           const updated = { ...prev };
           Object.keys(updated).forEach(u => {
-            // If last seen more than 40 seconds ago, mark as away
-            if (updated[u].lastSeen && now - updated[u].lastSeen > 40000) {
+            // If last seen more than 30 seconds ago, mark as away
+            if (updated[u].lastSeen && now - updated[u].lastSeen > 30000) {
               updated[u] = { ...updated[u], isOnline: false };
             }
           });
@@ -100,7 +100,15 @@ const App: React.FC = () => {
       const handleUnload = () => {
         sync.updatePresence(user, false);
       };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          sync.updatePresence(user, true);
+        }
+      };
+
       window.addEventListener('beforeunload', handleUnload);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
 
       return () => {
         unsubTheme();
@@ -109,6 +117,7 @@ const App: React.FC = () => {
         clearInterval(heartbeat);
         clearInterval(presenceInterval);
         window.removeEventListener('beforeunload', handleUnload);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
 
