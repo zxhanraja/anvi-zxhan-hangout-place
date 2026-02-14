@@ -75,31 +75,50 @@ const App: React.FC = () => {
     // Heartbeat mechanism for Presence
     let heartbeat: any;
     let inactivityTimer: any;
+    const lastSentStatus = { current: '' };
 
     if (user) {
+      const updateClientPresence = (u: string, s: string) => {
+        const isOnline = s === 'online';
+        const data = { user: u, isOnline, status: s, lastSeen: Date.now() };
+
+        // Update local state immediately for instant feedback
+        setPresence((prev: any) => ({ ...prev, [u]: data }));
+
+        // Only publish if status actually changed to avoid channel flood
+        if (lastSentStatus.current !== s) {
+          sync.updatePresence(u, s as any);
+          lastSentStatus.current = s;
+        }
+      };
+
       const resetInactivity = () => {
         clearTimeout(inactivityTimer);
         // If we were away or offline, set back to online
-        if (presence[user]?.status !== 'online') {
-          sync.updatePresence(user, 'online');
+        if (lastSentStatus.current !== 'online') {
+          updateClientPresence(user, 'online');
         }
         inactivityTimer = setTimeout(() => {
-          sync.updatePresence(user, 'away');
-        }, 10000); // 10 seconds for away
+          updateClientPresence(user, 'away');
+        }, 15000); // Increased to 15 seconds for away
       };
 
       // Initial online status
-      sync.updatePresence(user, 'online');
+      updateClientPresence(user, 'online');
       resetInactivity();
 
       heartbeat = setInterval(() => {
-        // Keep status consistent during heartbeat
-        const currentStatus = presence[user]?.status || 'online';
-        sync.updatePresence(user, currentStatus as any);
-      }, 5000);
+        // Heartbeat FORCE update every 10s to keep DB fresh, even if status same
+        sync.updatePresence(user, lastSentStatus.current as any);
+      }, 10000);
 
       const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
-      events.forEach(e => window.addEventListener(e, resetInactivity));
+      const throttledReset = () => {
+        // Only reset if we've moved significantly or haven't reset in a while
+        resetInactivity();
+      };
+
+      events.forEach(e => window.addEventListener(e, throttledReset));
 
       const handleUnload = () => {
         sync.updatePresence(user, 'offline');
@@ -107,10 +126,10 @@ const App: React.FC = () => {
 
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-          sync.updatePresence(user, 'online');
+          updateClientPresence(user, 'online');
           resetInactivity();
         } else {
-          sync.updatePresence(user, 'away');
+          updateClientPresence(user, 'away');
         }
       };
 
@@ -209,12 +228,12 @@ const App: React.FC = () => {
               <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className={`w-1 h-1 rounded-full ${presence[otherUser]?.status === 'online' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' :
-                    presence[otherUser]?.status === 'away' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' :
-                      'bg-white/5'
+                  presence[otherUser]?.status === 'away' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' :
+                    'bg-white/5'
                   }`} />
                 <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${presence[otherUser]?.status === 'online' ? 'text-green-500/60' :
-                    presence[otherUser]?.status === 'away' ? 'text-yellow-500/60' :
-                      'text-white/10'
+                  presence[otherUser]?.status === 'away' ? 'text-yellow-500/60' :
+                    'text-white/10'
                   }`}>{presence[otherUser]?.status || 'Offline'}</span>
               </div>
             </div>

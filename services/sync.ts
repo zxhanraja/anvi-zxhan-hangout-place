@@ -166,6 +166,7 @@ class SyncService {
 
   async saveStroke(type: string, user: string, data: any) {
     if (type === 'clear') {
+      this.strokeBuffer = []; // Clear pending strokes
       await this.clearStrokes();
       return;
     }
