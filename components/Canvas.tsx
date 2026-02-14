@@ -152,7 +152,8 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     ctx.stroke();
 
     const now = Date.now();
-    if (now - lastSyncTime.current > 12) { // Smoother: ~80fps throttling
+    // Broadcast for immediate sync (approx 60fps)
+    if (now - lastSyncTime.current > 16) {
       const width = canvasRef.current!.width;
       const height = canvasRef.current!.height;
 
@@ -167,10 +168,15 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
         size,
         tool
       };
+
+      // Broadcast is high priority
       sync.publish('drawing', payload);
+
+      // Persistence is handled by SyncService with internal batching
       sync.saveStroke('draw', user, payload);
+
       lastSyncTime.current = now;
-      lastSyncedPos.current = { x, y }; // Only update anchor after sync
+      lastSyncedPos.current = { x, y };
     }
     lastPos.current = { x, y };
   };

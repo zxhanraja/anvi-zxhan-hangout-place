@@ -135,8 +135,9 @@ class SyncService {
     await supabase.from('notifications').insert([{ sender: from, recipient: to, type, timestamp: Date.now() }]);
   }
 
-  async updatePresence(user: string, isOnline: boolean) {
-    const data = { user, isOnline, lastSeen: Date.now() };
+  async updatePresence(user: string, status: 'online' | 'away' | 'offline') {
+    const isOnline = status === 'online';
+    const data = { user, isOnline, status, lastSeen: Date.now() };
 
     // Broadcast via ephemeral channel for immediate UI update
     await this.channel.send({
@@ -151,6 +152,7 @@ class SyncService {
         await supabase.from('presence').upsert({
           user_id: user,
           is_online: isOnline,
+          status,
           last_seen: Date.now()
         }, { onConflict: 'user_id' });
       } catch (e) {
@@ -159,19 +161,37 @@ class SyncService {
     }
   }
 
+  private strokeBuffer: any[] = [];
+  private strokeTimer: any = null;
+
   async saveStroke(type: string, user: string, data: any) {
     if (type === 'clear') {
       await this.clearStrokes();
       return;
     }
 
-    if (navigator.onLine) {
-      await supabase.from('canvas_strokes').insert([{
-        type,
-        user_id: user,
-        data,
-        timestamp: Date.now()
-      }]);
+    // Buffer strokes to reduce DB pressure
+    this.strokeBuffer.push({
+      type,
+      user_id: user,
+      data,
+      timestamp: Date.now()
+    });
+
+    if (!this.strokeTimer) {
+      this.strokeTimer = setTimeout(async () => {
+        const batch = [...this.strokeBuffer];
+        this.strokeBuffer = [];
+        this.strokeTimer = null;
+
+        if (navigator.onLine && batch.length > 0) {
+          try {
+            await supabase.from('canvas_strokes').insert(batch);
+          } catch (e) {
+            console.error('Error saving strokes batch:', e);
+          }
+        }
+      }, 2000); // Save every 2 seconds
     }
   }
 

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.sync_state (
 CREATE TABLE IF NOT EXISTS public.presence (
   user_id text PRIMARY KEY,
   is_online boolean DEFAULT false,
+  status text DEFAULT 'offline', -- 'online', 'away', 'offline'
   last_seen bigint,
   mood text,
   updated_at timestamp WITH TIME ZONE DEFAULT timezone('utc'::text, now()) -- For server-side sync if needed

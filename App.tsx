@@ -66,7 +66,7 @@ const App: React.FC = () => {
       if (data) {
         const p: any = {};
         data.forEach((item: any) => {
-          p[item.user_id] = { user: item.user_id, isOnline: item.is_online, lastSeen: item.last_seen };
+          p[item.user_id] = { user: item.user_id, isOnline: item.is_online, status: item.status, lastSeen: item.last_seen };
         });
         setPresence(p);
       }
@@ -74,43 +74,43 @@ const App: React.FC = () => {
 
     // Heartbeat mechanism for Presence
     let heartbeat: any;
+    let inactivityTimer: any;
+
     if (user) {
-      // Update our own heartbeat immediately
-      sync.updatePresence(user, true);
+      const resetInactivity = () => {
+        clearTimeout(inactivityTimer);
+        // If we were away or offline, set back to online
+        if (presence[user]?.status !== 'online') {
+          sync.updatePresence(user, 'online');
+        }
+        inactivityTimer = setTimeout(() => {
+          sync.updatePresence(user, 'away');
+        }, 10000); // 10 seconds for away
+      };
+
+      // Initial online status
+      sync.updatePresence(user, 'online');
+      resetInactivity();
 
       heartbeat = setInterval(() => {
-        sync.updatePresence(user, true);
-      }, 5000); // 5 seconds heartbeat for better accuracy
-
-      // Monitor "Last Seen" for others every 5s
-      const presenceInterval = setInterval(() => {
-        setPresence((prev: any) => {
-          const now = Date.now();
-          const updated = { ...prev };
-          let changed = false;
-          Object.keys(updated).forEach(u => {
-            if (u === user) return; // Don't mark ourselves as away based on our own clock skew
-
-            // If last seen more than 60 seconds ago, mark as away
-            // Increased to 60s for better stability on slow networks/clock skews
-            if (updated[u].lastSeen && now - updated[u].lastSeen > 60000) {
-              if (updated[u].isOnline !== false) {
-                updated[u] = { ...updated[u], isOnline: false };
-                changed = true;
-              }
-            }
-          });
-          return changed ? updated : prev;
-        });
+        // Keep status consistent during heartbeat
+        const currentStatus = presence[user]?.status || 'online';
+        sync.updatePresence(user, currentStatus as any);
       }, 5000);
 
+      const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+      events.forEach(e => window.addEventListener(e, resetInactivity));
+
       const handleUnload = () => {
-        sync.updatePresence(user, false);
+        sync.updatePresence(user, 'offline');
       };
 
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-          sync.updatePresence(user, true);
+          sync.updatePresence(user, 'online');
+          resetInactivity();
+        } else {
+          sync.updatePresence(user, 'away');
         }
       };
 
@@ -122,7 +122,8 @@ const App: React.FC = () => {
         unsubPresence();
         unsubMissYou();
         clearInterval(heartbeat);
-        clearInterval(presenceInterval);
+        clearTimeout(inactivityTimer);
+        events.forEach(e => window.removeEventListener(e, resetInactivity));
         window.removeEventListener('beforeunload', handleUnload);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
@@ -207,8 +208,14 @@ const App: React.FC = () => {
             <div className="flex flex-col items-end">
               <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
               <div className="flex items-center gap-1.5 mt-1">
-                <div className={`w-1 h-1 rounded-full ${isOtherOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-white/5'}`} />
-                <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${isOtherOnline ? 'text-green-500/60' : 'text-white/10'}`}>{isOtherOnline ? 'Active' : 'Away'}</span>
+                <div className={`w-1 h-1 rounded-full ${presence[otherUser]?.status === 'online' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' :
+                    presence[otherUser]?.status === 'away' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' :
+                      'bg-white/5'
+                  }`} />
+                <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${presence[otherUser]?.status === 'online' ? 'text-green-500/60' :
+                    presence[otherUser]?.status === 'away' ? 'text-yellow-500/60' :
+                      'text-white/10'
+                  }`}>{presence[otherUser]?.status || 'Offline'}</span>
               </div>
             </div>
             <div className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
