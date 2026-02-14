@@ -34,7 +34,17 @@ CREATE TABLE IF NOT EXISTS public.presence (
   user_id text PRIMARY KEY,
   is_online boolean DEFAULT false,
   last_seen bigint,
-  mood text
+  mood text,
+  updated_at timestamp WITH TIME ZONE DEFAULT timezone('utc'::text, now()) -- For server-side sync if needed
+);
+
+-- CANVAS STROKES (Persistence for Drawing)
+CREATE TABLE IF NOT EXISTS public.canvas_strokes (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  type text NOT NULL, -- 'draw', 'stamp', 'clear' (clear will trigger a wipe of the table or a soft delete)
+  user_id text NOT NULL,
+  data jsonb NOT NULL,
+  timestamp bigint NOT NULL
 );
 
 -- NOTIFICATIONS (Used for "Miss You" signals)
@@ -150,7 +160,7 @@ END $$;
 
 DO $$
 DECLARE
-  table_list text[] := ARRAY['messages', 'presence', 'sync_state', 'scores', 'notifications'];
+  table_list text[] := ARRAY['messages', 'presence', 'sync_state', 'scores', 'notifications', 'canvas_strokes'];
   t text;
 BEGIN
   FOREACH t IN ARRAY table_list

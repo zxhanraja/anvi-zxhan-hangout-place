@@ -147,12 +147,49 @@ class SyncService {
 
     // Also persist to DB so people joining later see it
     if (navigator.onLine) {
-      await supabase.from('presence').upsert({
-        user_id: user,
-        is_online: isOnline,
-        last_seen: Date.now()
-      });
+      try {
+        await supabase.from('presence').upsert({
+          user_id: user,
+          is_online: isOnline,
+          last_seen: Date.now()
+        }, { onConflict: 'user_id' });
+      } catch (e) {
+        console.error('Presence upsert error:', e);
+      }
     }
+  }
+
+  async saveStroke(type: string, user: string, data: any) {
+    if (type === 'clear') {
+      await this.clearStrokes();
+      return;
+    }
+
+    if (navigator.onLine) {
+      await supabase.from('canvas_strokes').insert([{
+        type,
+        user_id: user,
+        data,
+        timestamp: Date.now()
+      }]);
+    }
+  }
+
+  async fetchStrokes() {
+    const { data, error } = await supabase
+      .from('canvas_strokes')
+      .select('*')
+      .order('timestamp', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching strokes:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  async clearStrokes() {
+    await supabase.from('canvas_strokes').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
   }
 
   async updateScore(user: string, points: number) {

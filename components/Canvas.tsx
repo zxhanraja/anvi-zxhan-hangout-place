@@ -32,6 +32,32 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
 
+    const drawAction = (action: any) => {
+      const width = canvas.width;
+      const height = canvas.height;
+
+      if (action.type === 'draw') {
+        ctx.beginPath();
+        ctx.strokeStyle = action.color || action.data?.color;
+        ctx.lineWidth = action.size || action.data?.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = (action.tool || action.data?.tool) === 'brush' ? 0.2 : 1.0;
+        ctx.moveTo((action.lastX || action.data?.lastX) * width, (action.lastY || action.data?.lastY) * height);
+        ctx.lineTo((action.x || action.data?.x) * width, (action.y || action.data?.y) * height);
+        ctx.stroke();
+      } else if (action.type === 'stamp') {
+        const size = action.size || action.data?.size;
+        const emoji = action.emoji || action.data?.emoji;
+        ctx.font = `${size * 4}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, (action.x || action.data?.x) * width, (action.y || action.data?.y) * height);
+      } else if (action.type === 'clear') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
     const resize = () => {
       if (!containerRef.current) return;
       const data = canvas.toDataURL();
@@ -51,30 +77,14 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     resize();
     window.addEventListener('resize', handleResize);
 
+    // Initial fetch of strokes
+    sync.fetchStrokes().then(strokes => {
+      strokes.forEach(s => drawAction(s));
+    });
+
     const unsubDrawing = sync.subscribe('drawing', (action: any) => {
       if (action.user === user) return;
-
-      const width = canvas.width;
-      const height = canvas.height;
-
-      if (action.type === 'draw') {
-        ctx.beginPath();
-        ctx.strokeStyle = action.color;
-        ctx.lineWidth = action.size;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalAlpha = action.tool === 'brush' ? 0.2 : 1.0;
-        ctx.moveTo(action.lastX * width, action.lastY * height);
-        ctx.lineTo(action.x * width, action.y * height);
-        ctx.stroke();
-      } else if (action.type === 'stamp') {
-        ctx.font = `${action.size * 4}px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(action.emoji, action.x * width, action.y * height);
-      } else if (action.type === 'clear') {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
+      drawAction(action);
     });
 
     return () => {
@@ -105,7 +115,9 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(activeEmoji, x, y);
-      sync.publish('drawing', { type: 'stamp', user, x: x / width, y: y / height, emoji: activeEmoji, size });
+      const payload = { type: 'stamp', user, x: x / width, y: y / height, emoji: activeEmoji, size };
+      sync.publish('drawing', payload);
+      sync.saveStroke('stamp', user, payload);
       return;
     }
     lastPos.current = { x, y };
@@ -156,6 +168,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
         tool
       };
       sync.publish('drawing', payload);
+      sync.saveStroke('draw', user, payload);
       lastSyncTime.current = now;
       lastSyncedPos.current = { x, y }; // Only update anchor after sync
     }
@@ -260,6 +273,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
           <button onClick={() => {
             canvasRef.current!.getContext('2d')!.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
             sync.publish('drawing', { type: 'clear', user });
+            sync.saveStroke('clear', user, {});
           }} className="p-3 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all shrink-0"><Trash2 className="w-5 h-5" /></button>
         </div>
       </div>

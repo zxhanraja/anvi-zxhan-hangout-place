@@ -87,13 +87,20 @@ const App: React.FC = () => {
         setPresence((prev: any) => {
           const now = Date.now();
           const updated = { ...prev };
+          let changed = false;
           Object.keys(updated).forEach(u => {
-            // If last seen more than 30 seconds ago, mark as away
-            if (updated[u].lastSeen && now - updated[u].lastSeen > 30000) {
-              updated[u] = { ...updated[u], isOnline: false };
+            if (u === user) return; // Don't mark ourselves as away based on our own clock skew
+
+            // If last seen more than 60 seconds ago, mark as away
+            // Increased to 60s for better stability on slow networks/clock skews
+            if (updated[u].lastSeen && now - updated[u].lastSeen > 60000) {
+              if (updated[u].isOnline !== false) {
+                updated[u] = { ...updated[u], isOnline: false };
+                changed = true;
+              }
             }
           });
-          return updated;
+          return changed ? updated : prev;
         });
       }, 5000);
 
