@@ -57,6 +57,13 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     };
     loadMessages();
 
+    // Re-fetch on reconnection to catch missed messages during offline/refresh bleeps
+    const handleReconnection = () => {
+      console.log('Online event detected, re-syncing chat history...');
+      loadMessages();
+    };
+    window.addEventListener('online', handleReconnection);
+
     // Listen to queue changes (for visual syncing status)
     const unsubQueue = sync.subscribe('queue_change', (queue: any[]) => {
       setOfflineQueue(queue);
@@ -81,6 +88,10 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
       })
       .subscribe((status) => {
         console.log('Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Every time we get back to SUBSCRIBED, refetch to be absolutely sure we didn't miss anything
+          loadMessages();
+        }
         if (status === 'CHANNEL_ERROR') {
           console.error('Realtime subscription failed. Ensure that "Realtime" is enabled for the "messages" table in Supabase.');
         }
@@ -96,6 +107,7 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
 
     return () => {
       console.log('Unsubscribing from channels');
+      window.removeEventListener('online', handleReconnection);
       subscription.unsubscribe();
       unsubChat();
       unsubQueue();

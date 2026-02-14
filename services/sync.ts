@@ -193,7 +193,7 @@ class SyncService {
       .from('messages')
       .select('*')
       .order('timestamp', { ascending: true })
-      .limit(100);
+      .limit(10000);
 
     if (error) {
       console.error('Supabase fetch error:', error.message, error.details, error.hint);

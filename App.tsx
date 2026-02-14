@@ -180,7 +180,7 @@ const App: React.FC = () => {
     <motion.div
       variants={shakeVariants}
       animate={isShaking ? 'shake' : 'idle'}
-      className="h-[100dvh] w-full flex flex-col md:flex-row overflow-hidden text-white bg-[#000000] select-none fixed inset-0"
+      className="h-[100dvh] w-full flex flex-col md:flex-row overflow-hidden text-white bg-[#000000] fixed inset-0"
       style={{ '--accent': accent } as any}
     >
       <Sidebar active={activeTab} setActive={setActiveTab} user={user} onLogout={() => { setUser(null); localStorage.removeItem('user_id'); }} accent={accent} setAccent={handleSetAccent} onMissYou={handleMissYou} />

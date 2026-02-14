@@ -84,19 +84,39 @@ CREATE POLICY "Public Access" ON public.scores FOR ALL USING (true) WITH CHECK (
 -- ==========================================
 -- AUTOMATED CLEANUP (The Cron part)
 -- ==========================================
--- Note: Supabase free tier doesn't support pg_cron easily without extensions.
--- Most reliable way for free tier: Trigger on EVERY INSERT to clean up old stuff.
+-- Logic:
+-- 1. Keep a safety buffer of 50 messages ALWAYS.
+-- 2. Delete ALL messages older than 24 hours.
+-- 3. If total messages > 100,000, trim the table to the newest 100,000.
 
 CREATE OR REPLACE FUNCTION clean_expired_data() 
 RETURNS TRIGGER AS $$
+DECLARE
+  twenty_four_hours_ago bigint;
 BEGIN
-  -- Delete messages where expiresAt is in the past
-  DELETE FROM public.messages WHERE "expiresAt" < (EXTRACT(EPOCH FROM NOW()) * 1000);
+  twenty_four_hours_ago := (EXTRACT(EPOCH FROM NOW()) * 1000) - (24 * 60 * 60 * 1000);
+
+  -- 1. Delete messages older than 24h (except the last 50 safety buffer)
+  DELETE FROM public.messages 
+  WHERE timestamp < twenty_four_hours_ago
+  AND id NOT IN (
+    SELECT id FROM public.messages 
+    ORDER BY timestamp DESC 
+    LIMIT 50
+  );
+
+  -- 2. Ensure total messages do not exceed 100,000
+  DELETE FROM public.messages 
+  WHERE id NOT IN (
+    SELECT id FROM public.messages 
+    ORDER BY timestamp DESC 
+    LIMIT 100000
+  );
   
   -- Delete notifications older than 48 hours
   DELETE FROM public.notifications WHERE timestamp < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (48 * 60 * 60 * 1000));
   
-  -- Reset scores older than 24 hours (Arcade keeps resets daily)
+  -- Reset scores older than 24 hours
   UPDATE public.scores SET score = 0, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000) 
   WHERE updated_at < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (24 * 60 * 60 * 1000));
   
@@ -104,7 +124,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Attach trigger to tables (runs on every new insert)
+-- Attach trigger to tables (runs on every new interaction/insert)
 DROP TRIGGER IF EXISTS tr_clean_expired ON public.messages;
 CREATE TRIGGER tr_clean_expired
   AFTER INSERT ON public.messages
