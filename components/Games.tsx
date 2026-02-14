@@ -146,6 +146,15 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       const res = getRPSResult(nextRps.Anvi, nextRps.Zxhan);
       if (res === 'ANVI WINS') {
         handleWin('Anvi');
+      } else if (res === 'ZXHAN WINS') {
+        handleWin('Zxhan');
+      } else {
+        // Tie - reset after a short delay or just let them pick again
+        setTimeout(() => {
+          const resetRps = { Anvi: null, Zxhan: null };
+          setRpsState(resetRps);
+          sync.publish('game', { type: 'rps', state: resetRps });
+        }, 2000);
       }
     }
   };
@@ -163,7 +172,8 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       const myTime = time;
       const otherTime = nextState.scores[other];
       if (myTime < otherTime) handleWin(user);
-      else handleWin(other);
+      else if (otherTime < myTime) handleWin(other);
+      else handleWin(user); // Tie-breaker: current clicker wins (rare)
     }
   };
 
@@ -190,7 +200,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleGuess = (letter: string) => {
-    if (wordState.setter === user || wordState.guesses.includes(letter)) return;
+    if (wordState.setter === user || wordState.guesses.includes(letter) || wordState.status !== 'guessing') return;
     const nextGuesses = [...wordState.guesses, letter];
     const uniqueWordLetters = new Set(wordState.word.split(''));
     const correctGuesses = nextGuesses.filter(l => uniqueWordLetters.has(l));
@@ -200,8 +210,14 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     const nextState = { ...wordState, guesses: nextGuesses, status: isWon ? 'won' as const : isLost ? 'lost' as const : 'guessing' as const };
     setWordState(nextState); sync.publish('game', { type: 'word', state: nextState });
 
-    if (isWon && wordState.setter === 'Zxhan') handleWin('Anvi');
-    if (isLost && wordState.setter === 'Anvi') handleWin('Anvi'); // Setter (Anvi) wins because Zxhan failed
+    const guesser = user;
+    const setter = wordState.setter as User;
+
+    if (isWon) {
+      handleWin(guesser);
+    } else if (isLost) {
+      handleWin(setter);
+    }
   };
 
   if (currentGame === 'menu') {
