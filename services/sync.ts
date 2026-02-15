@@ -27,16 +27,20 @@ class SyncService {
       })
       .on('broadcast', { event: 'state_change' }, (payload: any) => {
         const { type, data } = payload;
+        console.log(`Sync: Received broadcast [${type}]`, data);
         if (this.listeners[type]) {
           this.listeners[type].forEach(cb => cb(data));
         }
       })
       .subscribe((status: string) => {
         if (status === 'SUBSCRIBED') {
-          console.log('Connected to Realtime Sync');
+          console.log('Sync: Connected to Realtime');
           this.processOfflineQueue();
+        } else if (status === 'CLOSED') {
+          console.warn('Sync: Connection closed, re-subscribing...');
+          setTimeout(() => this.channel.subscribe(), 1000);
         } else {
-          console.warn('Realtime Sync Status:', status);
+          console.warn('Sync Status:', status);
         }
       });
 
@@ -64,11 +68,15 @@ class SyncService {
 
   async publish(type: string, data: any) {
     // For high-frequency data like drawing, we use broadcast directly
-    await this.channel.send({
+    const status = await this.channel.send({
       type: 'broadcast',
       event: 'state_change',
       payload: { type, data },
     });
+
+    if (status !== 'ok') {
+      console.warn(`Sync: Broadcast [${type}] failed:`, status);
+    }
 
     // Also save to a central state table for persistence
     if (type === 'theme' || type === 'music') {

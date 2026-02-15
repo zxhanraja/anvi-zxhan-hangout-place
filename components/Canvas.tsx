@@ -33,26 +33,29 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     const ctx = canvas.getContext('2d')!;
 
     const drawAction = (action: any) => {
+      if (!canvas) return;
       const width = canvas.width;
       const height = canvas.height;
+      const drawData = action.data || action;
 
       if (action.type === 'draw') {
         ctx.beginPath();
-        ctx.strokeStyle = action.color || action.data?.color;
-        ctx.lineWidth = action.size || action.data?.size;
+        ctx.strokeStyle = drawData.color;
+        ctx.lineWidth = drawData.size;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.globalAlpha = (action.tool || action.data?.tool) === 'brush' ? 0.2 : 1.0;
-        ctx.moveTo((action.lastX || action.data?.lastX) * width, (action.lastY || action.data?.lastY) * height);
-        ctx.lineTo((action.x || action.data?.x) * width, (action.y || action.data?.y) * height);
+        ctx.globalAlpha = drawData.tool === 'brush' ? 0.2 : 1.0;
+        ctx.moveTo(drawData.lastX * width, drawData.lastY * height);
+        ctx.lineTo(drawData.x * width, drawData.y * height);
         ctx.stroke();
       } else if (action.type === 'stamp') {
-        const size = action.size || action.data?.size;
-        const emoji = action.emoji || action.data?.emoji;
+        const size = drawData.size;
+        const emoji = drawData.emoji;
+        ctx.globalAlpha = 1.0;
         ctx.font = `${size * 4}px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(emoji, (action.x || action.data?.x) * width, (action.y || action.data?.y) * height);
+        ctx.fillText(emoji, drawData.x * width, drawData.y * height);
       } else if (action.type === 'clear') {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
@@ -64,7 +67,10 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
       canvas.width = containerRef.current.clientWidth;
       canvas.height = containerRef.current.clientHeight;
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+      };
       img.src = data;
     };
 
@@ -152,8 +158,8 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     ctx.stroke();
 
     const now = Date.now();
-    // Broadcast for immediate sync (approx 60fps) - reduced to 12ms for even smoother real-time
-    if (now - lastSyncTime.current > 12) {
+    // Broadcast throttle: 30ms is a good balance for smoothness and Supabase stability
+    if (now - lastSyncTime.current > 30) {
       const width = canvasRef.current!.width;
       const height = canvasRef.current!.height;
 

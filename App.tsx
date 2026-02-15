@@ -291,27 +291,26 @@ const LoginScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =
     <div className="h-[100dvh] w-full flex items-center justify-center bg-[#000000] p-6 relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]" />
 
-      <div className="flex flex-col md:flex-row gap-8 md:gap-12 z-10 w-full max-w-4xl justify-center items-center">
-        {/* Site Header Content */}
-        <div className="absolute top-12 left-0 right-0 text-center flex flex-col items-center gap-2">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-          >
-            <h1 className="font-display text-5xl md:text-7xl font-black italic uppercase tracking-[-0.05em] text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-              Private Hangout
-            </h1>
-            <div className="flex items-center justify-center gap-4 mt-2">
-              <div className="h-[1px] w-12 bg-white/20" />
-              <p className="font-display text-[10px] md:text-xs font-bold uppercase tracking-[0.8em] text-white/50 translate-x-[0.4em]">
-                Anvi & Zxhan
-              </p>
-              <div className="h-[1px] w-12 bg-white/20" />
-            </div>
-          </motion.div>
-        </div>
+      <div className="absolute top-8 md:top-12 left-0 right-0 text-center flex flex-col items-center gap-1 md:gap-2 z-20">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+        >
+          <h1 className="font-display text-4xl md:text-7xl font-black italic uppercase tracking-[-0.05em] text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+            Private Hangout
+          </h1>
+          <div className="flex items-center justify-center gap-2 md:gap-4 mt-1 md:mt-2">
+            <div className="h-[1px] w-8 md:w-12 bg-white/20" />
+            <p className="font-display text-[8px] md:text-xs font-bold uppercase tracking-[0.6em] md:tracking-[0.8em] text-white/50 translate-x-[0.3em] md:translate-x-[0.4em]">
+              Anvi & Zxhan
+            </p>
+            <div className="h-[1px] w-8 md:w-12 bg-white/20" />
+          </div>
+        </motion.div>
+      </div>
 
+      <div className="flex flex-col md:flex-row gap-4 md:gap-12 z-10 w-full max-w-4xl justify-center items-center mt-20 md:mt-0">
         <LoginCard
           user="Anvi"
           img={IMAGES.Anvi_Login}
@@ -341,7 +340,7 @@ const LoginCard: React.FC<{ user: User; img: string; onClick: () => void; accent
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover="hover"
-      className="relative w-60 md:w-64 aspect-[3/4.5] rounded-[2rem] bg-[#0a0a0a] border border-white/10 cursor-pointer group overflow-hidden shadow-2xl"
+      className="relative w-48 md:w-64 aspect-[3/4.2] md:aspect-[3/4.5] rounded-[2rem] bg-[#0a0a0a] border border-white/10 cursor-pointer group overflow-hidden shadow-2xl"
       onClick={onClick}
     >
       {/* Background Image - B&W Default, Color on Hover */}

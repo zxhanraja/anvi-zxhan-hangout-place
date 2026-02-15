@@ -275,7 +275,7 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
                 <div className={`p-4 rounded-[1.2rem] text-sm leading-relaxed ${m.sender === user ? 'bg-white/10 text-white border border-white/10 font-medium rounded-tr-none' : 'bg-white/[0.04] text-white/90 rounded-tl-none border border-white/[0.05] backdrop-blur-xl'}`}>
                   {m.image && (
                     <div className="cursor-pointer overflow-hidden rounded-lg mb-2" onClick={() => setLightboxImage(m.image!)}>
-                      <img src={m.image} alt="Shared" className="w-full max-h-60 object-contain hover:scale-105 transition-transform duration-500 brightness-90 hover:brightness-100" />
+                      <img src={m.image} alt="Shared" className="w-full max-h-48 md:max-h-64 object-contain hover:scale-105 transition-transform duration-500 brightness-90 hover:brightness-100" />
                     </div>
                   )}
                   {m.type === 'voice' && (
