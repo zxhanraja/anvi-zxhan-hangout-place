@@ -79,6 +79,14 @@ const App: React.FC = () => {
       }
     });
 
+    const unsubShake = sync.subscribe('shake', (data: any) => {
+      if (data.from !== user) {
+        console.log('Shake received from:', data.from);
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 800);
+      }
+    });
+
     // Initial presence fetch from DB (fallback)
     supabase.from('presence').select('*').then(({ data }) => {
       if (data) {
@@ -145,6 +153,7 @@ const App: React.FC = () => {
         unsubPresence();
         unsubPresenceSync();
         unsubMissYou();
+        unsubShake();
         clearTimeout(inactivityTimer);
         events.forEach(e => window.removeEventListener(e, throttledReset));
         window.removeEventListener('beforeunload', handleUnload);
@@ -156,6 +165,7 @@ const App: React.FC = () => {
       unsubTheme();
       unsubPresence();
       unsubMissYou();
+      unsubShake();
     };
   }, [user]);
 
@@ -168,10 +178,14 @@ const App: React.FC = () => {
     if (!user) return;
     const recipient = user === 'Anvi' ? 'Zxhan' : 'Anvi';
 
-    // Heartbeat/Cinematic broadcast
-    sync.publish('missyou', { sender: user, timestamp: Date.now(), type });
+    if (type === 'shake') {
+      // Use new shake sync method
+      console.log('Sending shake from', user, 'to', recipient);
+      await sync.sendShake(user, recipient);
+    } else if (type === 'missyou') {
+      // Heartbeat/Cinematic broadcast
+      sync.publish('missyou', { sender: user, timestamp: Date.now(), type });
 
-    if (type === 'missyou') {
       // Persistent Notification for Anvi's request
       const notificationMsg = user === 'Anvi' ? 'Anvi was missing u' : `${user} was missing u`;
       await sync.sendNotification(user, recipient, notificationMsg);
