@@ -78,6 +78,8 @@ class SyncService {
   }
 
   async publish(type: string, data: any) {
+    console.log(`Sync: Publishing [${type}]`, data);
+
     // For high-frequency data like drawing, we use broadcast directly
     const status = await this.channel.send({
       type: 'broadcast',
@@ -94,7 +96,7 @@ class SyncService {
       }
     }
 
-    // Also save to a central state table for persistence
+    // Save to database for persistence (theme and music always persist)
     if (type === 'theme' || type === 'music') {
       // For music, ensure we capture the current playback position
       if (type === 'music' && data.currentPosition === undefined && data.ytId) {
@@ -104,7 +106,13 @@ class SyncService {
           data.currentPosition = existing.currentPosition || 0;
         }
       }
+
       const { error } = await supabase.from('sync_state').upsert({ key: type, data });
+      if (error) {
+        console.error(`Sync: Failed to persist [${type}] to database:`, error);
+      } else {
+        console.log(`Sync: Successfully persisted [${type}] to database`);
+      }
     }
   }
 

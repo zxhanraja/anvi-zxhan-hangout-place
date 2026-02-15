@@ -28,16 +28,68 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
       console.log('YT API Ready');
     };
 
-    // Initial fetch
-    supabase.from('sync_state').select('*').eq('key', 'music').single().then(({ data }) => {
-      if (data) setCurrentMusic(data.data);
-    });
+    // Initial fetch from database
+    const loadInitialState = async () => {
+      const { data } = await supabase.from('sync_state').select('*').eq('key', 'music').single();
+      if (data?.data) {
+        console.log('MusicSync: Loaded initial state from DB:', data.data);
+        setCurrentMusic(data.data);
+      }
+    };
+    loadInitialState();
 
-    const unsub = sync.subscribe('music', (data: any) => {
+    // Subscribe to broadcast changes (for instant sync)
+    const unsubBroadcast = sync.subscribe('music', (data: any) => {
+      console.log('MusicSync: Received broadcast update:', data);
       setCurrentMusic(data);
     });
 
-    return () => unsub();
+    // Subscribe to database changes (for persistence and cross-tab sync)
+    const unsubDB = sync.subscribeToTable('sync_state', (payload: any) => {
+      if (payload.new?.key === 'music') {
+        console.log('MusicSync: DB change detected:', payload.new.data);
+        setCurrentMusic(payload.new.data);
+      }
+    });
+
+    // Save state on page unload or visibility change
+    const saveStateOnExit = () => {
+      if (playerRef.current && playerReady) {
+        try {
+          const currentPosition = playerRef.current.getCurrentTime() || 0;
+          const stateToSave = {
+            ...currentMusic,
+            currentPosition,
+            lastSaved: Date.now()
+          };
+          // Use navigator.sendBeacon for reliable save on unload
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-url.supabase.co';
+          const blob = new Blob([JSON.stringify({
+            key: 'music',
+            data: stateToSave
+          })], { type: 'application/json' });
+          navigator.sendBeacon(`${supabaseUrl}/rest/v1/sync_state?key=eq.music`, blob);
+        } catch (e) {
+          console.warn('Could not save state on exit:', e);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveStateOnExit();
+      }
+    };
+
+    window.addEventListener('beforeunload', saveStateOnExit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      unsubBroadcast();
+      unsubDB();
+      window.removeEventListener('beforeunload', saveStateOnExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Sync player state with currentMusic
@@ -47,6 +99,7 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
     if (!playerRef.current) {
       if (!(window as any).YT || !(window as any).YT.Player) return;
 
+      console.log('MusicSync: Creating new YouTube player');
       playerRef.current = new (window as any).YT.Player('yt-player-hidden', {
         height: '0',
         width: '0',
@@ -60,8 +113,20 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
         },
         events: {
           onReady: (event: any) => {
+            console.log('MusicSync: Player ready');
             setPlayerReady(true);
-            if (currentMusic.isPlaying) event.target.playVideo();
+
+            // Restore position if available
+            if (currentMusic.currentPosition && currentMusic.currentPosition > 0) {
+              event.target.seekTo(currentMusic.currentPosition, true);
+            }
+
+            // Apply play/pause state
+            if (currentMusic.isPlaying) {
+              event.target.playVideo();
+            } else {
+              event.target.pauseVideo();
+            }
           },
           onStateChange: (event: any) => {
             // Handle automatic looping or end of track if needed
@@ -72,27 +137,40 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
         }
       });
     } else {
-      // Player already exists, check if ID changed
-      const currentUrl = playerRef.current.getVideoUrl();
-      if (currentUrl && !currentUrl.includes(currentMusic.ytId)) {
-        playerRef.current.loadVideoById(currentMusic.ytId);
-      }
-
-      // Sync Play/Pause and Position
+      // Player already exists, sync state
       if (playerReady) {
-        // Seek to the synced position if provided
-        if (currentMusic.currentPosition !== undefined && currentMusic.currentPosition > 0) {
-          const currentPlayerTime = playerRef.current.getCurrentTime();
-          // Only seek if there's a significant difference (more than 2 seconds)
-          if (Math.abs(currentPlayerTime - currentMusic.currentPosition) > 2) {
-            playerRef.current.seekTo(currentMusic.currentPosition, true);
+        try {
+          // Check if video ID changed
+          const currentUrl = playerRef.current.getVideoUrl();
+          if (currentUrl && !currentUrl.includes(currentMusic.ytId)) {
+            console.log('MusicSync: Loading new video:', currentMusic.ytId);
+            playerRef.current.loadVideoById(currentMusic.ytId);
+            return; // Let onReady handle the rest
           }
-        }
 
-        if (currentMusic.isPlaying) {
-          playerRef.current.playVideo();
-        } else {
-          playerRef.current.pauseVideo();
+          // Get current player state
+          const playerState = playerRef.current.getPlayerState();
+          const isCurrentlyPlaying = playerState === (window as any).YT.PlayerState.PLAYING;
+
+          // Sync position if there's a significant difference
+          if (currentMusic.currentPosition !== undefined && currentMusic.currentPosition > 0) {
+            const currentPlayerTime = playerRef.current.getCurrentTime();
+            if (Math.abs(currentPlayerTime - currentMusic.currentPosition) > 2) {
+              console.log('MusicSync: Seeking to position:', currentMusic.currentPosition);
+              playerRef.current.seekTo(currentMusic.currentPosition, true);
+            }
+          }
+
+          // Sync play/pause state - only if different from current state
+          if (currentMusic.isPlaying && !isCurrentlyPlaying) {
+            console.log('MusicSync: Playing video');
+            playerRef.current.playVideo();
+          } else if (!currentMusic.isPlaying && isCurrentlyPlaying) {
+            console.log('MusicSync: Pausing video');
+            playerRef.current.pauseVideo();
+          }
+        } catch (e) {
+          console.warn('MusicSync: Error syncing player state:', e);
         }
       }
     }
