@@ -32,15 +32,18 @@ class SyncService {
           this.listeners[type].forEach(cb => cb(data));
         }
       })
-      .subscribe((status: string) => {
+      .subscribe((status: string, err?: any) => {
         if (status === 'SUBSCRIBED') {
           console.log('Sync: Connected to Realtime');
           this.processOfflineQueue();
-        } else if (status === 'CLOSED') {
-          console.warn('Sync: Connection closed, re-subscribing...');
-          setTimeout(() => this.channel.subscribe(), 1000);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.warn(`Sync: Connection ${status}, re-subscribing...`, err);
+          setTimeout(() => {
+            console.log('Sync: Attempting to re-subscribe...');
+            this.channel.subscribe();
+          }, 2000);
         } else {
-          console.warn('Sync Status:', status);
+          console.warn('Sync Status:', status, err);
         }
       });
 
@@ -76,6 +79,11 @@ class SyncService {
 
     if (status !== 'ok') {
       console.warn(`Sync: Broadcast [${type}] failed:`, status);
+      // If broadcast fails, we might need to re-subscribe if the channel went dead
+      if (status === 'error' || status === 'timed out') {
+        console.log('Sync: Channel might be dead, re-subscribing...');
+        this.channel.subscribe();
+      }
     }
 
     // Also save to a central state table for persistence

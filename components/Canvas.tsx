@@ -34,9 +34,12 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     const drawAction = (action: any) => {
       if (!canvas) return;
+      const ctx = canvas.getContext('2d')!;
       const width = canvas.width;
       const height = canvas.height;
       const drawData = action.data || action;
+
+      console.log('Canvas: Executing drawAction', action.type, drawData);
 
       if (action.type === 'draw') {
         ctx.beginPath();
@@ -89,6 +92,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     });
 
     const unsubDrawing = sync.subscribe('drawing', (action: any) => {
+      console.log('Canvas: Received broadcast action:', action);
       if (action.user === user) return;
       drawAction(action);
     });
