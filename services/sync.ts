@@ -49,6 +49,14 @@ class SyncService {
 
     // Listen for online status
     window.addEventListener('online', () => this.processOfflineQueue());
+
+    // Subscribe to shake_events table for realtime shake notifications
+    this.subscribeToTable('shake_events', (payload: any) => {
+      if (payload.eventType === 'INSERT' && this.listeners['shake']) {
+        const data = payload.new;
+        this.listeners['shake'].forEach(cb => cb(data));
+      }
+    });
   }
 
   async trackUser(user: string, status: 'online' | 'away' | 'offline') {
@@ -88,6 +96,14 @@ class SyncService {
 
     // Also save to a central state table for persistence
     if (type === 'theme' || type === 'music') {
+      // For music, ensure we capture the current playback position
+      if (type === 'music' && data.currentPosition === undefined && data.ytId) {
+        // If no position provided, try to preserve existing position
+        const existing = await this.fetchSyncState('music');
+        if (existing && existing.ytId === data.ytId) {
+          data.currentPosition = existing.currentPosition || 0;
+        }
+      }
       const { error } = await supabase.from('sync_state').upsert({ key: type, data });
     }
   }

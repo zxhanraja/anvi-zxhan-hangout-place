@@ -9,7 +9,7 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [ytLink, setYtLink] = useState('');
-  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '', startTime: 0 });
+  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '', startTime: 0, currentPosition: 0 });
   const [playerReady, setPlayerReady] = useState(false);
 
   const playerRef = useRef<any>(null);
@@ -78,8 +78,17 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
         playerRef.current.loadVideoById(currentMusic.ytId);
       }
 
-      // Sync Play/Pause
+      // Sync Play/Pause and Position
       if (playerReady) {
+        // Seek to the synced position if provided
+        if (currentMusic.currentPosition !== undefined && currentMusic.currentPosition > 0) {
+          const currentPlayerTime = playerRef.current.getCurrentTime();
+          // Only seek if there's a significant difference (more than 2 seconds)
+          if (Math.abs(currentPlayerTime - currentMusic.currentPosition) > 2) {
+            playerRef.current.seekTo(currentMusic.currentPosition, true);
+          }
+        }
+
         if (currentMusic.isPlaying) {
           playerRef.current.playVideo();
         } else {
@@ -87,7 +96,7 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
         }
       }
     }
-  }, [currentMusic.ytId, currentMusic.isPlaying, playerReady]);
+  }, [currentMusic.ytId, currentMusic.isPlaying, currentMusic.currentPosition, playerReady]);
 
   const handlePlayNew = () => {
     const id = ytLink.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/)?.[2];
@@ -112,8 +121,22 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const togglePlayback = () => {
-    const d = { ...currentMusic, isPlaying: !currentMusic.isPlaying };
+  const togglePlayback = async () => {
+    // Get current playback position from the player
+    let currentPosition = 0;
+    if (playerRef.current && playerReady) {
+      try {
+        currentPosition = playerRef.current.getCurrentTime() || 0;
+      } catch (e) {
+        console.warn('Could not get current time from player:', e);
+      }
+    }
+
+    const d = {
+      ...currentMusic,
+      isPlaying: !currentMusic.isPlaying,
+      currentPosition // Sync the exact position where pause/play happened
+    };
     sync.publish('music', d);
     setCurrentMusic(d);
   };
