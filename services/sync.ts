@@ -217,7 +217,7 @@ class SyncService {
             console.error('Error saving strokes batch:', e);
           }
         }
-      }, 2000); // Save every 2 seconds
+      }, 100); // Save every 100ms for better real-time sync
     }
   }
 
@@ -291,6 +291,71 @@ class SyncService {
 
     console.log(`Sync: Successfully fetched ${data?.length || 0} messages`);
     return data || [];
+  }
+
+  async fetchSyncState(key: string) {
+    const { data, error } = await supabase
+      .from('sync_state')
+      .select('data')
+      .eq('key', key)
+      .single();
+
+    if (error) {
+      console.log(`Sync: No state found for key '${key}'`);
+      return null;
+    }
+    return data?.data || null;
+  }
+
+  subscribeToTable(table: string, callback: Function) {
+    const channel = supabase
+      .channel(`${table}_changes`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table },
+        (payload) => {
+          console.log(`Sync: Table ${table} changed:`, payload);
+          callback(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }
+
+  async sendShake(from: string, to: string) {
+    await supabase.from('shake_events').insert([{
+      sender: from,
+      recipient: to,
+      timestamp: Date.now(),
+      acknowledged: false
+    }]);
+
+    // Also broadcast for instant notification
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'state_change',
+      payload: { type: 'shake', data: { from, to, timestamp: Date.now() } },
+    });
+  }
+
+  async fetchShakes(user: string) {
+    const { data } = await supabase
+      .from('shake_events')
+      .select('*')
+      .eq('recipient', user)
+      .eq('acknowledged', false)
+      .order('timestamp', { ascending: false });
+    return data || [];
+  }
+
+  async acknowledgeShake(id: string) {
+    await supabase
+      .from('shake_events')
+      .update({ acknowledged: true })
+      .eq('id', id);
   }
 
   saveLocal(key: string, data: any) {

@@ -97,9 +97,23 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
       drawAction(action);
     });
 
+    // Subscribe to database changes for persistence
+    const unsubTable = sync.subscribeToTable('canvas_strokes', (payload: any) => {
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const stroke = payload.new;
+        if (stroke.user_id === user) return; // Skip own strokes
+        console.log('Canvas: DB stroke received:', stroke);
+        drawAction(stroke);
+      } else if (payload.eventType === 'DELETE') {
+        // Handle clear event
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    });
+
     return () => {
       window.removeEventListener('resize', handleResize);
       unsubDrawing();
+      unsubTable();
     };
   }, [user]);
 
@@ -162,8 +176,8 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     ctx.stroke();
 
     const now = Date.now();
-    // Broadcast throttle: 30ms is a good balance for smoothness and Supabase stability
-    if (now - lastSyncTime.current > 30) {
+    // Broadcast throttle: 16ms for 60fps smoothness
+    if (now - lastSyncTime.current > 16) {
       const width = canvasRef.current!.width;
       const height = canvasRef.current!.height;
 
