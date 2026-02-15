@@ -80,8 +80,9 @@ const App: React.FC = () => {
     });
 
     const unsubShake = sync.subscribe('shake', (data: any) => {
-      if (data.from !== user) {
-        console.log('Shake received from:', data.from);
+      // Only shake if the current user is the recipient
+      if (data.recipient === user || data.to === user) {
+        console.log('Shake received from:', data.sender || data.from, 'for:', user);
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 800);
       }
