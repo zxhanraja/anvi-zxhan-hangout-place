@@ -9,7 +9,7 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [ytLink, setYtLink] = useState('');
-  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '', startTime: 0, currentPosition: 0 });
+  const [currentMusic, setCurrentMusic] = useState({ isPlaying: false, ytId: '', title: 'SILENCE', addedBy: '' as User | '', startTime: 0, currentPosition: 0, lastUpdatedBy: '' as User | '' });
   const [playerReady, setPlayerReady] = useState(false);
 
   const playerRef = useRef<any>(null);
@@ -41,6 +41,11 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
     // Subscribe to broadcast changes (for instant sync)
     const unsubBroadcast = sync.subscribe('music', (data: any) => {
       console.log('MusicSync: Received broadcast update:', data);
+      // Ignore updates that we initiated ourselves
+      if (data.lastUpdatedBy && data.lastUpdatedBy === user) {
+        console.log('MusicSync: Ignoring self-initiated update');
+        return;
+      }
       setCurrentMusic(data);
     });
 
@@ -48,6 +53,11 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
     const unsubDB = sync.subscribeToTable('sync_state', (payload: any) => {
       if (payload.new?.key === 'music') {
         console.log('MusicSync: DB change detected:', payload.new.data);
+        // Ignore updates that we initiated ourselves
+        if (payload.new.data.lastUpdatedBy && payload.new.data.lastUpdatedBy === user) {
+          console.log('MusicSync: Ignoring self-initiated DB update');
+          return;
+        }
         setCurrentMusic(payload.new.data);
       }
     });
@@ -185,7 +195,9 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
       ytId: id,
       title: 'SYNCED BEAT',
       addedBy: user,
-      startTime: Date.now()
+      startTime: Date.now(),
+      currentPosition: 0,
+      lastUpdatedBy: user
     };
 
     sync.publish('music', data);
@@ -213,10 +225,15 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
     const d = {
       ...currentMusic,
       isPlaying: !currentMusic.isPlaying,
-      currentPosition // Sync the exact position where pause/play happened
+      currentPosition, // Sync the exact position where pause/play happened
+      lastUpdatedBy: user // Track who initiated this change
     };
-    sync.publish('music', d);
+
+    // Update local state immediately for responsive UI
     setCurrentMusic(d);
+
+    // Then broadcast to other devices
+    sync.publish('music', d);
   };
 
   return (
