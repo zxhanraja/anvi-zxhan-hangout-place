@@ -230,18 +230,28 @@ class SyncService {
 
     if (!this.strokeTimer) {
       this.strokeTimer = setTimeout(async () => {
-        const batch = [...this.strokeBuffer];
-        this.strokeBuffer = [];
-        this.strokeTimer = null;
-
-        if (navigator.onLine && batch.length > 0) {
-          try {
-            await supabase.from('canvas_strokes').insert(batch);
-          } catch (e) {
-            console.error('Error saving strokes batch:', e);
-          }
-        }
+        await this.flushStrokes();
       }, 100); // Save every 100ms for better real-time sync
+    }
+  }
+
+  // Force immediate save of all pending strokes
+  async flushStrokes() {
+    if (this.strokeTimer) {
+      clearTimeout(this.strokeTimer);
+      this.strokeTimer = null;
+    }
+
+    const batch = [...this.strokeBuffer];
+    this.strokeBuffer = [];
+
+    if (navigator.onLine && batch.length > 0) {
+      try {
+        console.log(`Sync: Flushing ${batch.length} strokes to database`);
+        await supabase.from('canvas_strokes').insert(batch);
+      } catch (e) {
+        console.error('Error saving strokes batch:', e);
+      }
     }
   }
 

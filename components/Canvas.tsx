@@ -205,7 +205,13 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
     lastPos.current = { x, y };
   };
 
-  const stop = () => setIsDrawing(false);
+  const stop = () => {
+    if (isDrawing) {
+      // Flush all pending strokes to ensure complete drawing is saved
+      sync.flushStrokes();
+    }
+    setIsDrawing(false);
+  };
 
   return (
     <div className="h-full flex flex-col p-2 md:p-6 bg-[#050505] gap-2 md:gap-4 overflow-hidden">
