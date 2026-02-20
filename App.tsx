@@ -20,7 +20,7 @@ const IMAGES = {
   Zxhan_Login: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg?tr=w-400,h-600,f-auto'
 };
 
-const SHOW_ZXHAN_PROFILE = false;
+const SHOW_ZXHAN_PROFILE = true;
 
 const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
   const src = user === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb;
