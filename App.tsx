@@ -55,9 +55,12 @@ const App: React.FC = () => {
     const unsubPresenceSync = sync.subscribe('presence_sync', (state: any) => {
       setPresence((prev: any) => {
         const p: any = { ...prev };
+        const usersInState = new Set();
+
         Object.keys(state).forEach(key => {
           const presenceEntry = state[key][0];
           if (presenceEntry) {
+            usersInState.add(presenceEntry.user);
             p[presenceEntry.user] = {
               user: presenceEntry.user,
               isOnline: presenceEntry.status === 'online',
@@ -66,6 +69,14 @@ const App: React.FC = () => {
             };
           }
         });
+
+        // Mark users as offline if they are NOT in the current presence state
+        ['Anvi', 'Zxhan'].forEach(u => {
+          if (!usersInState.has(u) && p[u]) {
+            p[u] = { ...p[u], isOnline: false, status: 'offline' };
+          }
+        });
+
         return p;
       });
     });
@@ -94,8 +105,16 @@ const App: React.FC = () => {
     supabase.from('presence').select('*').then(({ data }) => {
       if (data) {
         const p: any = {};
+        const now = Date.now();
         data.forEach((item: any) => {
-          p[item.user_id] = { user: item.user_id, isOnline: item.is_online, status: item.status, lastSeen: item.last_seen };
+          // If last seen is older than 2 minutes, assume offline
+          const isRecent = now - item.last_seen < 120000;
+          p[item.user_id] = {
+            user: item.user_id,
+            isOnline: isRecent ? item.is_online : false,
+            status: isRecent ? item.status : 'offline',
+            lastSeen: item.last_seen
+          };
         });
         setPresence(p);
       }

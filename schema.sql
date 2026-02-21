@@ -170,6 +170,12 @@ BEGIN
   -- 6. Cleanup old canvas strokes (older than 7 days to keep it clean)
   DELETE FROM public.canvas_strokes 
   WHERE timestamp < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (7 * 24 * 60 * 60 * 1000));
+
+  -- 7. Mark stale presence as offline (older than 10 minutes)
+  UPDATE public.presence 
+  SET is_online = false, status = 'offline'
+  WHERE last_seen < ((EXTRACT(EPOCH FROM NOW()) * 1000) - (10 * 60 * 1000))
+  AND status != 'offline';
   
   RETURN NEW;
 END;
