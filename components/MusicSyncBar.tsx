@@ -241,10 +241,10 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
       {/* Hidden Player Div */}
       <div id="yt-player-hidden" className="fixed -top-[1000px] left-0 pointer-events-none opacity-0" />
 
-      {/* Dynamic Positioning - Top on Mobile, Corner on Desktop */}
+      {/* Dynamic Positioning - Bottom on Mobile (above dock), Corner on Desktop */}
       <div
         ref={containerRef}
-        className="fixed top-20 left-0 right-0 flex justify-center md:top-auto md:bottom-8 md:right-8 md:left-auto md:justify-end z-[150] pointer-events-none px-4"
+        className="fixed bottom-24 left-0 right-0 flex justify-center md:bottom-8 md:right-8 md:left-auto md:justify-end z-[150] pointer-events-none px-4"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

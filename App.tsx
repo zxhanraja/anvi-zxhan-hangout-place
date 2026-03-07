@@ -270,31 +270,33 @@ const App: React.FC = () => {
     >
       <Sidebar active={activeTab} setActive={setActiveTab} user={user} onLogout={() => { setUser(null); localStorage.removeItem('user_id'); }} accent={accent} setAccent={handleSetAccent} onMissYou={handleMissYou} />
       <main className="flex-1 relative flex flex-col bg-[#000000] min-w-0 h-full overflow-hidden">
-        <header className="px-4 md:px-10 py-3 md:py-4 border-b border-white/[0.03] flex justify-between items-center z-50 bg-[#000000]/80 backdrop-blur-2xl shrink-0">
-          <h2 className="font-display text-xs md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
-          <div className="flex items-center gap-3 md:gap-4 shrink-0">
-            <div className="flex flex-col items-end">
-              <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className={`w-1 h-1 rounded-full ${presence[otherUser]?.status === 'online' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' :
-                  presence[otherUser]?.status === 'away' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' :
-                    'bg-white/5'
-                  }`} />
-                <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${presence[otherUser]?.status === 'online' ? 'text-green-500/60' :
-                  presence[otherUser]?.status === 'away' ? 'text-yellow-500/60' :
-                    'text-white/10'
-                  }`}>{presence[otherUser]?.status || 'Offline'}</span>
+        {activeTab !== 'games' && (
+          <header className="px-4 md:px-10 py-3 md:py-4 border-b border-white/[0.03] flex justify-between items-center z-50 bg-[#000000]/80 backdrop-blur-2xl shrink-0">
+            <h2 className="font-display text-xs md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
+            <div className="flex items-center gap-3 md:gap-4 shrink-0">
+              <div className="flex flex-col items-end">
+                <span className="text-[7px] md:text-[10px] font-bold uppercase tracking-widest opacity-20 leading-none">{otherUser}</span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className={`w-1 h-1 rounded-full ${presence[otherUser]?.status === 'online' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' :
+                    presence[otherUser]?.status === 'away' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' :
+                      'bg-white/5'
+                    }`} />
+                  <span className={`text-[7px] md:text-[9px] font-black uppercase tracking-tighter ${presence[otherUser]?.status === 'online' ? 'text-green-500/60' :
+                    presence[otherUser]?.status === 'away' ? 'text-yellow-500/60' :
+                      'text-white/10'
+                    }`}>{presence[otherUser]?.status || 'Offline'}</span>
+                </div>
+              </div>
+              <div className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
+                <img
+                  src={otherUser === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb}
+                  alt={otherUser}
+                  className="w-full h-full object-cover grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all"
+                />
               </div>
             </div>
-            <div className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
-              <img
-                src={otherUser === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb}
-                alt={otherUser}
-                className="w-full h-full object-cover grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all"
-              />
-            </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <div className="flex-1 relative overflow-hidden h-full">
           {/* ... (Tab Content) ... */}
