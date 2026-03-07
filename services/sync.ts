@@ -96,8 +96,8 @@ class SyncService {
       }
     }
 
-    // Save to database for persistence (theme and music always persist)
-    if (type === 'theme' || type === 'music') {
+    // Save to database for persistence (theme, music, and game state always persist)
+    if (type === 'theme' || type === 'music' || type === 'game') {
       // For music, ensure we capture the current playback position
       if (type === 'music' && data.currentPosition === undefined && data.ytId) {
         // If no position provided, try to preserve existing position

@@ -35,6 +35,25 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       setScores(s);
     });
 
+    // Fetch initial game state
+    sync.fetchSyncState('game').then(data => {
+      if (!data) return;
+      if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
+      if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
+      if (data.type === 'tictactoe') {
+        setBoard(data.board);
+        setXIsNext(data.xIsNext);
+        setTttHistory(data.history || []);
+        setCurrentGame('tictactoe');
+      }
+      if (data.type === 'connect4') { setC4Board(data.board); setC4Turn(data.turn); setCurrentGame('connect4'); }
+      if (data.type === 'word') { setWordState(data.state); setCurrentGame('word'); }
+      if (data.type === 'truthordare') { setTdActive(data.active); setCurrentGame('truthordare'); }
+      if (data.type === 'reaction') { setReactionState(data.state); setCurrentGame('reaction'); }
+      if (data.type === 'rps') { setRpsState(data.state); setCurrentGame('rps'); }
+      if (data.type === 'win') { setWinner(data.winner); }
+    });
+
     const unsub = sync.subscribe('game', (data: any) => {
       if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
       if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
