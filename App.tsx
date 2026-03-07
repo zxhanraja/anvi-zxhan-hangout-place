@@ -85,6 +85,14 @@ const App: React.FC = () => {
       setPresence((prev: any) => ({ ...prev, [data.user]: data }));
     });
 
+    const unsubThemeTable = sync.subscribeToTable('sync_state', (payload: any) => {
+      if (payload.new?.key === 'theme') {
+        const data = payload.new.data;
+        setAccent(data.accent);
+        localStorage.setItem('theme_accent', data.accent);
+      }
+    });
+
     const unsubMissYou = sync.subscribe('missyou', (data: any) => {
       if (data.sender !== user) {
         setIsShaking(true);
@@ -176,6 +184,7 @@ const App: React.FC = () => {
         unsubPresenceSync();
         unsubMissYou();
         unsubShake();
+        unsubThemeTable();
         clearTimeout(inactivityTimer);
         events.forEach(e => window.removeEventListener(e, throttledReset));
         window.removeEventListener('beforeunload', handleUnload);
