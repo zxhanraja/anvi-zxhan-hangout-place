@@ -302,6 +302,26 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const ScoreBoard = () => (
+    <div className="flex items-center justify-center gap-4 md:gap-8 mb-8">
+      <div className="flex flex-col items-center p-3 md:p-5 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[80px] md:min-w-[120px]">
+        <span className="text-[8px] md:text-[10px] font-black tracking-widest opacity-30 italic">ANVI</span>
+        <span className="text-2xl md:text-4xl font-display font-black text-[var(--accent)]">{scores.Anvi}</span>
+      </div>
+      <div className="h-8 w-[1px] bg-white/5" />
+      <div className="flex flex-col items-center p-3 md:p-5 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[80px] md:min-w-[120px]">
+        <span className="text-[8px] md:text-[10px] font-black tracking-widest opacity-30 italic">ZXHAN</span>
+        <span className="text-2xl md:text-4xl font-display font-black opacity-40">{scores.Zxhan}</span>
+      </div>
+    </div>
+  );
+
+  const clearGameState = () => {
+    if (confirm("Reset current game session for both players?")) {
+      switchGame('menu');
+    }
+  };
+
   if (currentGame === 'menu') {
     return (
       <div className="h-full flex flex-col items-center p-4 md:p-6 overflow-y-auto no-scrollbar bg-black">
@@ -309,17 +329,8 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
           <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter font-display">ARCADE</h2>
           <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-white/10 mt-3">PRO COMPETITION</p>
 
-          {/* Scoreboard - Responsive */}
-          <div className="mt-8 flex items-center justify-center gap-4 md:gap-8">
-            <div className="flex flex-col items-center p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-3xl min-w-[100px] md:min-w-[140px]">
-              <span className="text-[10px] md:text-xs font-black tracking-widest opacity-30 italic">ANVI</span>
-              <span className="text-3xl md:text-5xl font-display font-black text-[var(--accent)]">{scores.Anvi}</span>
-            </div>
-            <div className="h-10 w-[1px] bg-white/5" />
-            <div className="flex flex-col items-center p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-3xl min-w-[100px] md:min-w-[140px]">
-              <span className="text-[10px] md:text-xs font-black tracking-widest opacity-30 italic">ZXHAN</span>
-              <span className="text-3xl md:text-5xl font-display font-black opacity-40">{scores.Zxhan}</span>
-            </div>
+          <div className="mt-8">
+            <ScoreBoard />
           </div>
         </header>
 
@@ -349,10 +360,17 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="h-full flex flex-col items-center p-4 md:p-6 bg-black relative overflow-y-auto no-scrollbar">
-      <button onClick={() => switchGame('menu')} className="fixed top-4 left-4 md:top-8 md:left-8 px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest z-[150] shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
+      <div className="fixed top-4 left-4 md:top-8 md:left-8 flex gap-2 z-[150]">
+        <button onClick={() => switchGame('menu')} className="px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
+        <button onClick={clearGameState} className="px-4 md:px-5 py-2 md:py-2.5 bg-red-600 text-white rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform italic">RESET ARCADE</button>
+      </div>
+
+      <div className="mt-16 md:mt-20 w-full flex flex-col items-center">
+        <ScoreBoard />
+      </div>
 
       {currentGame === 'connect4' && (
-        <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-lg pb-40 px-4">
+        <div className="flex flex-col items-center gap-6 md:gap-8 w-full max-w-lg pb-40 px-4">
           <div className="text-center space-y-2 mb-4">
             <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">GRAVITY CORE</h3>
             <p className="text-[7px] md:text-[8px] font-bold text-blue-500 uppercase tracking-[0.4em]">4 IN A ROW TO CONQUER</p>
@@ -388,7 +406,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {currentGame === 'word' && (
-        <div className="flex flex-col items-center gap-8 md:gap-10 mt-16 md:mt-20 w-full max-w-2xl pb-40 px-4">
+        <div className="flex flex-col items-center gap-8 md:gap-10 w-full max-w-2xl pb-40 px-4">
           <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">HANGMAN DUEL</h3>
           {wordState.status === 'setting' ? (
             <div className="w-full max-w-sm space-y-4 md:space-y-6">
@@ -434,7 +452,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {currentGame === 'rps' && (
-        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-md pb-40 px-4">
+        <div className="flex flex-col items-center gap-8 md:gap-12 w-full max-w-md pb-40 px-4">
           <div className="text-center space-y-2">
             <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">CLASH PRO</h3>
             <p className="text-[7px] md:text-[8px] font-bold opacity-30 uppercase tracking-[0.4em]">ROCK PAPER SCISSORS LIZARD SPOCK</p>
@@ -472,7 +490,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {currentGame === 'reaction' && (
-        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-md pb-40 px-4">
+        <div className="flex flex-col items-center gap-8 md:gap-12 w-full max-w-md pb-40 px-4">
           <div className="text-center space-y-2">
             <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">BLITZ REACTION</h3>
             <p className="text-[7px] md:text-[8px] font-bold opacity-30 uppercase tracking-[0.4em]">CLICK FAST WHEN IT TURNS GREEN</p>
@@ -510,7 +528,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {currentGame === 'tictactoe' && (
-        <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-md pb-40">
+        <div className="flex flex-col items-center gap-6 md:gap-8 w-full max-w-md pb-40">
           <div className="text-center space-y-2 mb-4">
             <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">INFINITY TACTICS</h3>
             <p className="text-[7px] md:text-[8px] font-bold text-[var(--accent)] uppercase tracking-[0.4em]">ONLY 3 MARKS ALLOWED // NO DRAWS POSSIBLE</p>
@@ -538,7 +556,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {currentGame === 'truthordare' && (
-        <div className="flex flex-col items-center gap-8 md:gap-12 mt-16 md:mt-20 w-full max-w-lg pb-40 px-4">
+        <div className="flex flex-col items-center gap-8 md:gap-12 w-full max-w-lg pb-40 px-4">
           <div className="text-center space-y-2">
             <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">FLAME DUEL</h3>
             <p className="text-[7px] md:text-[8px] font-bold text-orange-500 uppercase tracking-[0.4em]">EXTREME TRUTH OR DARE</p>
