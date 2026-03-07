@@ -315,7 +315,7 @@ const App: React.FC = () => {
               </motion.div>
             )}
             {activeTab === 'games' && (
-              <motion.div key="games" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 h-full w-full overflow-hidden z-20 bg-[#000000]">
+              <motion.div key="games" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 h-full w-full overflow-hidden z-[60] bg-[#000000]">
                 <Games user={user} />
               </motion.div>
             )}
