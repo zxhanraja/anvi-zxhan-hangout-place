@@ -270,8 +270,8 @@ const App: React.FC = () => {
     >
       <Sidebar active={activeTab} setActive={setActiveTab} user={user} onLogout={() => { setUser(null); localStorage.removeItem('user_id'); }} accent={accent} setAccent={handleSetAccent} onMissYou={handleMissYou} />
       <main className="flex-1 relative flex flex-col bg-[#000000] min-w-0 h-full overflow-hidden">
-        {activeTab !== 'games' && (
-          <header className="px-4 md:px-10 py-3 md:py-4 border-b border-white/[0.03] flex justify-between items-center z-50 bg-[#000000]/80 backdrop-blur-2xl shrink-0">
+        <header className={`absolute top-0 left-0 right-0 z-50 border-b border-white/[0.03] bg-[#000000]/80 backdrop-blur-2xl transition-all duration-300 ${activeTab === 'games' ? 'opacity-0 pointer-events-none -translate-y-full' : 'opacity-100 translate-y-0'}`}>
+          <div className="px-4 md:px-10 py-3 md:py-4 flex justify-between items-center">
             <h2 className="font-display text-xs md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
             <div className="flex items-center gap-3 md:gap-4 shrink-0">
               <div className="flex flex-col items-end">
@@ -295,8 +295,8 @@ const App: React.FC = () => {
                 />
               </div>
             </div>
-          </header>
-        )}
+          </div>
+        </header>
 
         <div className="flex-1 relative overflow-hidden h-full">
           {/* ... (Tab Content) ... */}
@@ -307,12 +307,14 @@ const App: React.FC = () => {
             className="absolute inset-0 h-full w-full overflow-hidden"
             style={{ zIndex: activeTab === 'chat' ? 10 : 0 }}
           >
-            <Chat user={user} isActive={activeTab === 'chat'} />
+            <div className="h-full pt-12 md:pt-16">
+              <Chat user={user} isActive={activeTab === 'chat'} />
+            </div>
           </motion.div>
 
           <AnimatePresence mode="popLayout">
             {activeTab === 'drawing' && (
-              <motion.div key="drawing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 h-full w-full overflow-hidden z-20 bg-[#000000]">
+              <motion.div key="drawing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 h-full w-full overflow-hidden z-20 bg-[#000000] pt-12 md:pt-16">
                 <Canvas user={user} />
               </motion.div>
             )}
