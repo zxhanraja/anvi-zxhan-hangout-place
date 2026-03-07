@@ -5,7 +5,7 @@ import { Play, Pause, Link as LinkIcon, Music } from 'lucide-react';
 import { sync, supabase } from '../services/sync';
 import { User } from '../types';
 
-export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
+export const MusicSyncBar: React.FC<{ user: User; activeTab?: string }> = ({ user, activeTab }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [ytLink, setYtLink] = useState('');
@@ -241,10 +241,12 @@ export const MusicSyncBar: React.FC<{ user: User }> = ({ user }) => {
       {/* Hidden Player Div */}
       <div id="yt-player-hidden" className="fixed -top-[1000px] left-0 pointer-events-none opacity-0" />
 
-      {/* Dynamic Positioning - Bottom on Mobile (above dock), Corner on Desktop */}
+      {/* Dynamic Positioning - Top on Mobile, Corner on Desktop */}
       <div
         ref={containerRef}
-        className="fixed bottom-24 left-0 right-0 flex justify-center md:bottom-8 md:right-8 md:left-auto md:justify-end z-[150] pointer-events-none px-4"
+        className={`fixed left-0 right-0 flex justify-center z-[150] pointer-events-none px-4 transition-all duration-500
+          ${activeTab === 'games' ? 'top-[4.5rem] md:top-auto md:bottom-8' : 'top-3 md:top-auto md:bottom-8'}
+          md:right-8 md:left-auto md:justify-end md:bottom-8`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

@@ -327,7 +327,7 @@ const App: React.FC = () => {
         </div>
 
 
-        <MusicSyncBar user={user} />
+        <MusicSyncBar user={user} activeTab={activeTab} />
         <div className="md:hidden h-[75px] md:h-[85px] shrink-0 pointer-events-none" />
       </main>
     </motion.div>
