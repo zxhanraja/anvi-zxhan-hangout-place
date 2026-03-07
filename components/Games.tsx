@@ -320,7 +320,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="h-full flex flex-col items-center p-4 md:p-6 bg-black relative overflow-y-auto no-scrollbar">
-      <button onClick={() => setCurrentGame('menu')} className="fixed top-4 left-4 md:top-8 md:left-8 px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest z-[150] shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
+      <button onClick={() => switchGame('menu')} className="fixed top-4 left-4 md:top-8 md:left-8 px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest z-[150] shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
 
       {currentGame === 'connect4' && (
         <div className="flex flex-col items-center gap-6 md:gap-8 mt-16 md:mt-20 w-full max-w-lg pb-40 px-4">
