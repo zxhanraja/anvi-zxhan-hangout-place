@@ -35,99 +35,77 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       setScores(s);
     });
 
-    // Fetch initial game state
+    // Fetch initial game state and set the view accordingly
     sync.fetchSyncState('game').then(data => {
       if (!data) return;
+      handleIncomingGameState(data, true);
+    });
+
+    // Unified handler for game state updates
+    const handleIncomingGameState = (data: any, forceViewChange: boolean) => {
       if (data.type === 'switch') {
         setCurrentGame(data.game);
         setWinner(null);
         if (data.game === 'menu') {
-          setBoard(Array(9).fill(null));
-          setTttHistory([]);
-          setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
-          setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
-          setRpsState({ Anvi: null, Zxhan: null });
-          setReactionState({ status: 'waiting', startTime: 0, scores: {} });
-          setTdActive({ type: '', content: '' } as any);
+          resetAllGameStatesLocally();
+        }
+        return;
+      }
+
+      // For all other game types, only update the board/state
+      // DO NOT call setCurrentGame unless forceViewChange is true (e.g. on initial load)
+      if (forceViewChange) {
+        if (['tictactoe', 'connect4', 'word', 'truthordare', 'reaction', 'rps'].includes(data.type)) {
+          setCurrentGame(data.type as any);
         }
       }
-      if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
+
       if (data.type === 'tictactoe') {
         setBoard(data.board);
         setXIsNext(data.xIsNext);
         setTttHistory(data.history || []);
-        setCurrentGame('tictactoe');
+      } else if (data.type === 'connect4') {
+        setC4Board(data.board);
+        setC4Turn(data.turn);
+      } else if (data.type === 'word') {
+        setWordState(data.state);
+      } else if (data.type === 'truthordare') {
+        setTdActive(data.active);
+      } else if (data.type === 'reaction') {
+        setReactionState(data.state);
+      } else if (data.type === 'rps') {
+        setRpsState(data.state);
+      } else if (data.type === 'win') {
+        setWinner(data.winner);
+      } else if (data.type === 'reset') {
+        setWinner(null);
+        if (data.startingPlayer) setStartingPlayer(data.startingPlayer);
       }
-      if (data.type === 'connect4') { setC4Board(data.board); setC4Turn(data.turn); setCurrentGame('connect4'); }
-      if (data.type === 'word') { setWordState(data.state); setCurrentGame('word'); }
-      if (data.type === 'truthordare') { setTdActive(data.active); setCurrentGame('truthordare'); }
-      if (data.type === 'reaction') { setReactionState(data.state); setCurrentGame('reaction'); }
-      if (data.type === 'rps') { setRpsState(data.state); setCurrentGame('rps'); }
-      if (data.type === 'win') { setWinner(data.winner); }
-    });
+    };
 
-    const unsub = sync.subscribe('game', (data: any) => {
-      if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
-      if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
-      if (data.type === 'tictactoe') {
-        setBoard(data.board);
-        setXIsNext(data.xIsNext);
-        setTttHistory(data.history || []);
-        setCurrentGame('tictactoe');
-      }
-      if (data.type === 'connect4') { setC4Board(data.board); setC4Turn(data.turn); setCurrentGame('connect4'); }
-      if (data.type === 'word') { setWordState(data.state); setCurrentGame('word'); }
-      if (data.type === 'truthordare') { setTdActive(data.active); setCurrentGame('truthordare'); }
-      if (data.type === 'reaction') { setReactionState(data.state); setCurrentGame('reaction'); }
-      if (data.type === 'rps') { setRpsState(data.state); setCurrentGame('rps'); }
-      if (data.type === 'win') { setWinner(data.winner); }
-    });
+    const resetAllGameStatesLocally = () => {
+      setBoard(Array(9).fill(null));
+      setTttHistory([]);
+      setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
+      setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
+      setRpsState({ Anvi: null, Zxhan: null });
+      setReactionState({ status: 'waiting', startTime: 0, scores: {} });
+      setTdActive({ type: '', content: '' } as any);
+      setWinner(null);
+    };
 
-    const unsubScores = sync.subscribe('scores', (data: any) => {
-      setScores(prev => ({ ...prev, [data.user]: data.score }));
-    });
-
+    // Subscriptions
+    const unsubBroadcast = sync.subscribe('game', (data: any) => handleIncomingGameState(data, false));
+    const unsubScores = sync.subscribe('scores', (data: any) => setScores(prev => ({ ...prev, [data.user]: data.score })));
     const unsubScoreTable = sync.subscribeToTable('scores', (payload: any) => {
-      if (payload.new) {
-        setScores(prev => ({ ...prev, [payload.new.user_id]: payload.new.score }));
-      }
+      if (payload.new) setScores(prev => ({ ...prev, [payload.new.user_id]: payload.new.score }));
     });
-
     const unsubGameTable = sync.subscribeToTable('sync_state', (payload: any) => {
-      if (payload.new?.key === 'game') {
-        const data = payload.new.data;
-        if (data.type === 'switch') {
-          setCurrentGame(data.game);
-          setWinner(null);
-          if (data.game === 'menu') {
-            // Reset all game states when switching to menu
-            setBoard(Array(9).fill(null));
-            setTttHistory([]);
-            setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
-            setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
-            setRpsState({ Anvi: null, Zxhan: null });
-            setReactionState({ status: 'waiting', startTime: 0, scores: {} });
-            setTdActive({ type: '', content: '' } as any);
-          }
-        }
-        if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
-        if (data.type === 'tictactoe') {
-          setBoard(data.board);
-          setXIsNext(data.xIsNext);
-          setTttHistory(data.history || []);
-          setCurrentGame('tictactoe');
-        }
-        if (data.type === 'connect4') { setC4Board(data.board); setC4Turn(data.turn); setCurrentGame('connect4'); }
-        if (data.type === 'word') { setWordState(data.state); setCurrentGame('word'); }
-        if (data.type === 'truthordare') { setTdActive(data.active); setCurrentGame('truthordare'); }
-        if (data.type === 'reaction') { setReactionState(data.state); setCurrentGame('reaction'); }
-        if (data.type === 'rps') { setRpsState(data.state); setCurrentGame('rps'); }
-        if (data.type === 'win') { setWinner(data.winner); }
-      }
+      if (payload.new?.key === 'game') handleIncomingGameState(payload.new.data, false);
     });
 
     return () => {
-      unsub();
+      unsubBroadcast();
       unsubScores();
       unsubScoreTable();
       unsubGameTable();
@@ -145,7 +123,6 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     setCurrentGame(game);
     setWinner(null);
     if (game === 'menu') {
-      // Clear board states locally when quitting
       setBoard(Array(9).fill(null));
       setTttHistory([]);
     }
@@ -302,49 +279,56 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const ScoreBoard = () => (
-    <div className="flex items-center justify-center gap-4 md:gap-8 mb-8">
-      <div className="flex flex-col items-center p-3 md:p-5 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[80px] md:min-w-[120px]">
-        <span className="text-[8px] md:text-[10px] font-black tracking-widest opacity-30 italic">ANVI</span>
-        <span className="text-2xl md:text-4xl font-display font-black text-[var(--accent)]">{scores.Anvi}</span>
+  const ScoreBoard = ({ minimal = false }: { minimal?: boolean }) => (
+    <div className={`flex items-center justify-center gap-3 md:gap-8 ${minimal ? 'mb-2' : 'mb-8'}`}>
+      <div className={`flex flex-col items-center ${minimal ? 'p-2 md:p-3' : 'p-3 md:p-5'} bg-white/[0.02] border border-white/5 rounded-2xl min-w-[70px] md:min-w-[120px]`}>
+        <span className="text-[7px] md:text-[10px] font-black tracking-widest opacity-30 italic leading-none">ANVI</span>
+        <span className={`${minimal ? 'text-xl md:text-2xl' : 'text-2xl md:text-4xl'} font-display font-black text-[var(--accent)] mt-1`}>{scores.Anvi}</span>
       </div>
-      <div className="h-8 w-[1px] bg-white/5" />
-      <div className="flex flex-col items-center p-3 md:p-5 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[80px] md:min-w-[120px]">
-        <span className="text-[8px] md:text-[10px] font-black tracking-widest opacity-30 italic">ZXHAN</span>
-        <span className="text-2xl md:text-4xl font-display font-black opacity-40">{scores.Zxhan}</span>
+      <div className="h-6 md:h-8 w-[1px] bg-white/5" />
+      <div className={`flex flex-col items-center ${minimal ? 'p-2 md:p-3' : 'p-3 md:p-5'} bg-white/[0.02] border border-white/5 rounded-2xl min-w-[70px] md:min-w-[120px]`}>
+        <span className="text-[7px] md:text-[10px] font-black tracking-widest opacity-30 italic leading-none">ZXHAN</span>
+        <span className={`${minimal ? 'text-xl md:text-2xl' : 'text-2xl md:text-4xl'} font-display font-black opacity-40 mt-1`}>{scores.Zxhan}</span>
       </div>
     </div>
   );
 
   const clearGameState = () => {
-    if (confirm("Reset current game session for both players?")) {
+    if (confirm("Reset current game session for both players? This will force everyone to the menu.")) {
       switchGame('menu');
     }
   };
 
   if (currentGame === 'menu') {
     return (
-      <div className="h-full flex flex-col items-center p-4 md:p-6 overflow-y-auto no-scrollbar bg-black">
+      <div className="h-full flex flex-col items-center p-4 md:p-6 overflow-y-auto no-scrollbar bg-black animate-in fade-in duration-500">
         <header className="text-center mt-6 md:mt-12 mb-8 md:mb-16">
-          <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter font-display">ARCADE</h2>
-          <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-white/10 mt-3">PRO COMPETITION</p>
+          <h2 className="text-4xl md:text-7xl font-black italic uppercase tracking-tighter font-display leading-none">ARCADE</h2>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <div className="h-[1px] w-6 bg-white/10" />
+            <p className="text-[9px] font-bold uppercase tracking-[0.5em] text-white/20 italic">LIVE COMPETITION</p>
+            <div className="h-[1px] w-6 bg-white/10" />
+          </div>
 
-          <div className="mt-8">
+          <div className="mt-12">
             <ScoreBoard />
           </div>
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 w-full max-w-5xl pb-32">
           {[
-            { id: 'tictactoe', icon: LayoutGrid, name: 'INFINITY', desc: 'TACTICAL TTT' },
-            { id: 'connect4', icon: Grid2X2, name: 'GRAVITY', desc: 'CONNECT 4' },
-            { id: 'word', icon: Skull, name: 'HANGMAN', desc: 'WORD DUEL' },
-            { id: 'rps', icon: Hand, name: 'CLASH', desc: 'LIZARD SPOCK' },
-            { id: 'reaction', icon: Zap, name: 'BLITZ', desc: 'REACTION' },
-            { id: 'truthordare', icon: Flame, name: 'FLAME', desc: 'T OR D' },
+            { id: 'tictactoe', icon: LayoutGrid, name: 'INFINITY', desc: 'TACTICAL TTT', color: 'text-blue-500' },
+            { id: 'connect4', icon: Grid2X2, name: 'GRAVITY', desc: 'CONNECT 4', color: 'text-purple-500' },
+            { id: 'word', icon: Skull, name: 'HANGMAN', desc: 'WORD DUEL', color: 'text-red-500' },
+            { id: 'rps', icon: Hand, name: 'CLASH', desc: 'LIZARD SPOCK', color: 'text-green-500' },
+            { id: 'reaction', icon: Zap, name: 'BLITZ', desc: 'REACTION', color: 'text-yellow-500' },
+            { id: 'truthordare', icon: Flame, name: 'FLAME', desc: 'T OR D', color: 'text-orange-500' },
           ].map((game) => (
-            <motion.button key={game.id} whileHover={{ y: -5, scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => switchGame(game.id as any)} className="p-6 md:p-8 bg-white/[0.03] border border-white/[0.06] rounded-[2rem] md:rounded-[2.5rem] hover:bg-white hover:text-black transition-all group flex items-center gap-4 md:gap-6 text-left shadow-2xl">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/5 group-hover:bg-black/5 flex items-center justify-center shrink-0 transition-colors text-white group-hover:text-black">
+            <motion.button key={game.id} whileHover={{ y: -5, scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => switchGame(game.id as any)} className="p-6 md:p-8 bg-white/[0.03] border border-white/[0.06] rounded-[2.5rem] hover:bg-white hover:text-black transition-all group flex items-center gap-4 md:gap-6 text-left shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-10 transition-opacity">
+                <game.icon className="w-12 h-12" />
+              </div>
+              <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-white/5 group-hover:bg-black/5 flex items-center justify-center shrink-0 transition-colors ${game.color} group-hover:text-black`}>
                 <game.icon className="w-6 h-6 md:w-8 md:h-8 shrink-0" />
               </div>
               <div className="min-w-0">
@@ -359,14 +343,25 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   }
 
   return (
-    <div className="h-full flex flex-col items-center p-4 md:p-6 bg-black relative overflow-y-auto no-scrollbar">
-      <div className="fixed top-4 left-4 md:top-8 md:left-8 flex gap-2 z-[150]">
-        <button onClick={() => switchGame('menu')} className="px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform italic">← QUIT</button>
-        <button onClick={clearGameState} className="px-4 md:px-5 py-2 md:py-2.5 bg-red-600 text-white rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform italic">RESET ARCADE</button>
-      </div>
+    <div className="h-full flex flex-col items-center bg-black relative overflow-y-auto no-scrollbar pt-20 md:pt-24 px-4">
+      {/* Sticky Header for Controls and Scores */}
+      <div className="fixed top-0 left-0 right-0 z-[200] bg-black/80 backdrop-blur-2xl border-b border-white/[0.03] p-3 md:p-4 flex items-center justify-between px-4 md:px-8">
+        <div className="flex gap-2">
+          <button onClick={() => switchGame('menu')} className="px-4 py-2 bg-white text-black rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform italic flex items-center gap-1.5">
+            <LayoutGrid className="w-3 h-3" />
+            <span>MENU</span>
+          </button>
+          <button onClick={clearGameState} className="px-4 py-2 bg-red-600/10 text-red-500 border border-red-500/20 rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-xl hover:bg-red-600 hover:text-white transition-all italic">RESET</button>
+        </div>
 
-      <div className="mt-16 md:mt-20 w-full flex flex-col items-center">
-        <ScoreBoard />
+        <div className="flex-1 flex justify-center">
+          <ScoreBoard minimal={true} />
+        </div>
+
+        <div className="hidden md:flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.4)]" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-white/20 italic">LIVE MATCH</span>
+        </div>
       </div>
 
       {currentGame === 'connect4' && (
