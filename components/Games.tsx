@@ -38,7 +38,19 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     // Fetch initial game state
     sync.fetchSyncState('game').then(data => {
       if (!data) return;
-      if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
+      if (data.type === 'switch') {
+        setCurrentGame(data.game);
+        setWinner(null);
+        if (data.game === 'menu') {
+          setBoard(Array(9).fill(null));
+          setTttHistory([]);
+          setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
+          setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
+          setRpsState({ Anvi: null, Zxhan: null });
+          setReactionState({ status: 'waiting', startTime: 0, scores: {} });
+          setTdActive({ type: '', content: '' } as any);
+        }
+      }
       if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
       if (data.type === 'tictactoe') {
         setBoard(data.board);
@@ -84,8 +96,20 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     const unsubGameTable = sync.subscribeToTable('sync_state', (payload: any) => {
       if (payload.new?.key === 'game') {
         const data = payload.new.data;
-        // Ignore self updates if they come via broadcast first (optional, but Table is safer)
-        if (data.type === 'switch') { setCurrentGame(data.game); setWinner(null); }
+        if (data.type === 'switch') {
+          setCurrentGame(data.game);
+          setWinner(null);
+          if (data.game === 'menu') {
+            // Reset all game states when switching to menu
+            setBoard(Array(9).fill(null));
+            setTttHistory([]);
+            setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
+            setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
+            setRpsState({ Anvi: null, Zxhan: null });
+            setReactionState({ status: 'waiting', startTime: 0, scores: {} });
+            setTdActive({ type: '', content: '' } as any);
+          }
+        }
         if (data.type === 'reset') { setWinner(null); if (data.startingPlayer) setStartingPlayer(data.startingPlayer); }
         if (data.type === 'tictactoe') {
           setBoard(data.board);
@@ -120,6 +144,11 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   const switchGame = (game: typeof currentGame) => {
     setCurrentGame(game);
     setWinner(null);
+    if (game === 'menu') {
+      // Clear board states locally when quitting
+      setBoard(Array(9).fill(null));
+      setTttHistory([]);
+    }
     sync.publish('game', { type: 'switch', game });
   };
 
