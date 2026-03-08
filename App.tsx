@@ -270,7 +270,7 @@ const App: React.FC = () => {
     >
       <Sidebar active={activeTab} setActive={setActiveTab} user={user} onLogout={() => { setUser(null); localStorage.removeItem('user_id'); }} accent={accent} setAccent={handleSetAccent} onMissYou={handleMissYou} />
       <main className="flex-1 relative flex flex-col bg-[#000000] min-w-0 h-full overflow-hidden">
-        <header className={`absolute top-0 left-0 right-0 z-50 border-b border-white/[0.03] bg-[#000000]/80 backdrop-blur-2xl transition-all duration-300 ${activeTab === 'games' ? 'opacity-0 pointer-events-none -translate-y-full' : 'opacity-100 translate-y-0'}`}>
+        <header className={`absolute top-0 left-0 right-0 z-50 bg-[#000000] transition-all duration-300 ${activeTab === 'games' ? 'opacity-0 pointer-events-none -translate-y-full' : 'opacity-100 translate-y-0'}`}>
           <div className="px-4 md:px-10 py-3 md:py-4 flex justify-between items-center">
             <h2 className="font-display text-xs md:text-lg font-black italic uppercase tracking-[0.2em] opacity-80 truncate mr-4">{activeTab}</h2>
             <div className="flex items-center gap-3 md:gap-4 shrink-0">
