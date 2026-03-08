@@ -264,10 +264,6 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   return (
     <div className="h-full flex flex-col bg-[#000000] relative">
       <div className="flex-1 overflow-y-auto px-4 md:px-12 pt-6 pb-28 no-scrollbar">
-        <div className="flex flex-col items-center py-6 opacity-5">
-          <Shield className="w-3 h-3 mb-1" />
-          <p className="text-[7px] font-bold uppercase tracking-[0.5em]">PERSISTENT SECURED LINE</p>
-        </div>
         <div className="space-y-6 max-w-2xl mx-auto">
           {messages.map((m) => (
             <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${m.sender === user ? 'items-end' : 'items-start'}`}>
