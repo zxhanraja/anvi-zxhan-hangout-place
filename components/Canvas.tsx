@@ -225,13 +225,13 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="pointer-events-auto flex flex-wrap justify-center gap-3 p-4 bg-black/90 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl max-w-[280px]"
+              className="pointer-events-auto flex flex-wrap justify-center gap-2 md:gap-3 p-3 md:p-4 bg-black/90 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl max-w-[240px] md:max-w-[280px]"
             >
               {PRESET_COLORS.map(c => (
                 <button
                   key={c}
                   onClick={() => { setColor(c); setShowColorPicker(false); if (tool === 'eraser') setTool('pen'); }}
-                  className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-90 ${color === c ? 'border-white' : 'border-transparent'}`}
+                  className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-90 ${color === c ? 'border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -261,18 +261,18 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
         </AnimatePresence>
 
         {/* Professional Dock */}
-        <div className="pointer-events-auto flex items-center gap-2 md:gap-4 bg-[#0a0a0a]/80 backdrop-blur-3xl border border-white/10 p-2.5 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+        <div className="pointer-events-auto flex items-center gap-1 md:gap-4 bg-[#0a0a0a]/80 backdrop-blur-3xl border border-white/10 p-1.5 md:p-2.5 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
           <button
             onClick={() => setShowColorPicker(!showColorPicker)}
-            className={`w-11 h-11 rounded-full border-2 transition-all flex items-center justify-center overflow-hidden shrink-0 ${showColorPicker ? 'border-white scale-110 ring-4 ring-white/10' : 'border-white/20 active:scale-95'}`}
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-full border-2 transition-all flex items-center justify-center overflow-hidden shrink-0 ${showColorPicker ? 'border-white scale-110 ring-4 ring-white/10' : 'border-white/20 active:scale-95'}`}
             style={{ backgroundColor: color }}
           >
-            <Palette className={`w-5 h-5 ${color === '#ffffff' ? 'text-black' : 'text-white'} mix-blend-difference opacity-50`} />
+            <Palette className={`w-4 h-4 md:w-5 md:h-5 ${color === '#ffffff' ? 'text-black' : 'text-white'} mix-blend-difference opacity-50`} />
           </button>
 
-          <div className="w-px h-8 bg-white/10 mx-1" />
+          <div className="w-px h-6 md:h-8 bg-white/10 mx-0.5 md:mx-1" />
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 md:gap-1">
             {[
               { id: 'pen', icon: Palette, label: 'Pen' },
               { id: 'brush', icon: Layers, label: 'Brush' },
@@ -282,17 +282,17 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
               <button
                 key={t.id}
                 onClick={() => { setTool(t.id as any); setShowColorPicker(false); }}
-                className={`p-3 rounded-full transition-all group relative ${tool === t.id ? 'bg-white text-black shadow-xl scale-105' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}
+                className={`p-2 md:p-3 rounded-full transition-all group relative ${tool === t.id ? 'bg-white text-black shadow-xl scale-105' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}
               >
-                <t.icon className="w-5 h-5" />
+                <t.icon className="w-4 h-4 md:w-5 md:h-5" />
                 <span className={`absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 border border-white/10 rounded text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none`}>{t.label}</span>
               </button>
             ))}
           </div>
 
-          <div className="w-px h-8 bg-white/10 mx-1" />
+          <div className="w-px h-6 md:h-8 bg-white/10 mx-0.5 md:mx-1" />
 
-          <div className="flex items-center gap-3 px-2">
+          <div className="flex items-center gap-1 md:gap-3 px-1 md:px-2">
             <div className="hidden md:block w-1 h-8 bg-white/5 rounded-full overflow-hidden">
               <motion.div animate={{ height: `${(size / 50) * 100}%` }} className="w-full bg-white origin-bottom" />
             </div>
@@ -302,7 +302,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
               max="50"
               value={size}
               onChange={e => setSize(parseInt(e.target.value))}
-              className="w-20 md:w-32 accent-white h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
+              className="w-14 md:w-32 accent-white h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
             />
           </div>
 
@@ -310,7 +310,7 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
             canvasRef.current!.getContext('2d')!.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
             sync.publish('drawing', { type: 'clear', user });
             sync.saveStroke('clear', user, {});
-          }} className="p-3 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all shrink-0"><Trash2 className="w-5 h-5" /></button>
+          }} className="p-2 md:p-3 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all shrink-0"><Trash2 className="w-4 h-4 md:w-5 md:h-5" /></button>
         </div>
       </div>
 
