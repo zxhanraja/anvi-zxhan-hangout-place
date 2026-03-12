@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Message, User } from '../types';
 import { sync, supabase } from '../services/sync';
-import { Send, Image as ImageIcon, Smile, Shield, X, Mic, StopCircle } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, Shield, X, Mic, StopCircle, Plus } from 'lucide-react';
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 
 const REACTION_EMOJIS = ['❤️', '🔥', '✨', '🥺', '💀', '💯', '🙌'];
@@ -33,6 +33,8 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
   const inputRef = useRef<HTMLInputElement>(null);
   const [offlineQueue, setOfflineQueue] = useState<any[]>(sync.getQueue());
   const emojiPickerRef = useRef<HTMLDivElement>(null); // Ref for outside click
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Initial fetch from Supabase with retry
@@ -138,6 +140,23 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showEmojiPicker]);
+
+  // Outside click handler for Plus Menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showPlusMenu &&
+        plusMenuRef.current &&
+        !plusMenuRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).closest('.plus-toggle-btn')
+      ) {
+        setShowPlusMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPlusMenu]);
 
   const sendMessage = async (content?: string, image?: string, audio?: string) => {
     if (!content?.trim() && !image && !audio) return;
@@ -437,25 +456,63 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
         </AnimatePresence>
         <div className="max-w-2xl mx-auto p-1.5 bg-[#0a0a0a]/90 border border-white/5 rounded-full flex items-center gap-1 shadow-2xl backdrop-blur-3xl relative z-40">
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
-          <button onClick={() => fileInputRef.current?.click()} className="p-3 text-white/10 hover:text-white/40 transition-colors shrink-0"><ImageIcon className="w-5 h-5" /></button>
-
-          <div className="flex items-center gap-1 group relative">
-            {isRecording && (
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="absolute right-full mr-4 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 backdrop-blur-xl shrink-0 whitespace-nowrap">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black italic text-red-500 uppercase tracking-widest">{formatTime(recordingTime)} / 5:00</span>
-              </motion.div>
-            )}
-            <button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
-              className={`p-3 transition-all shrink-0 ${isRecording ? 'text-red-500 scale-125' : 'text-white/10 hover:text-white/40'}`}
+          
+          <div className="relative flex items-center">
+            <button 
+              onClick={() => setShowPlusMenu(!showPlusMenu)} 
+              className={`plus-toggle-btn p-3 transition-all shrink-0 ${showPlusMenu ? 'text-white rotate-45' : 'text-white/10 hover:text-white/40'}`}
             >
-              <Mic className={`w-5 h-5 ${isRecording ? 'animate-pulse' : ''}`} />
+              <Plus className="w-5 h-5" />
             </button>
+
+            <AnimatePresence>
+              {showPlusMenu && (
+                <motion.div
+                  ref={plusMenuRef}
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  className="absolute bottom-full mb-4 left-0 bg-[#0a0a0a]/95 backdrop-blur-3xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50 p-1 flex flex-col gap-1 min-w-[140px]"
+                >
+                  <button 
+                    onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }} 
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-white/70 hover:text-white transition-all rounded-xl"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    <span className="text-xs font-semibold">Image</span>
+                  </button>
+
+                  <div className="h-px bg-white/5 mx-2" />
+
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 text-white/70 hover:text-white transition-all rounded-xl relative">
+                    <div className="flex items-center gap-3">
+                      <Mic className={`w-4 h-4 ${isRecording ? 'text-red-500 animate-pulse' : ''}`} />
+                      <span className="text-xs font-semibold">{isRecording ? 'Recording...' : 'Voice Note'}</span>
+                    </div>
+                    
+                    <button
+                      onMouseDown={startRecording}
+                      onMouseUp={stopRecording}
+                      onTouchStart={startRecording}
+                      onTouchEnd={stopRecording}
+                      className={`absolute inset-0 w-full h-full opacity-0 cursor-pointer`}
+                    />
+                    
+                    {isRecording && (
+                      <span className="text-[10px] font-mono text-red-500">{formatTime(recordingTime)}</span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
+          {isRecording && !showPlusMenu && (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="absolute bottom-full mb-4 left-4 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 backdrop-blur-xl shrink-0 whitespace-nowrap z-50">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-black italic text-red-500 uppercase tracking-widest">{formatTime(recordingTime)} / 5:00</span>
+            </motion.div>
+          )}
 
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`emoji-toggle-btn p-3 transition-colors shrink-0 ${showEmojiPicker ? 'text-white' : 'text-white/10 hover:text-white/40'}`}><Smile className="w-5 h-5" /></button>
           <input
