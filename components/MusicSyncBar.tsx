@@ -39,26 +39,24 @@ export const MusicSyncBar: React.FC<{ user: User; activeTab?: string }> = ({ use
     loadInitialState();
 
     // Subscribe to broadcast changes (for instant sync)
-    const unsubBroadcast = sync.subscribe('music', (data: any) => {
-      console.log('MusicSync: Received broadcast update:', data);
-      // Ignore updates that we initiated ourselves
-      if (data.lastUpdatedBy && data.lastUpdatedBy === user) {
-        console.log('MusicSync: Ignoring self-initiated update');
+    const unsubBroadcast = sync.subscribe('music', (payload: any) => {
+      console.log('MusicSync: Received broadcast update:', payload);
+      // Ignore updates that we initiated ourselves in this session
+      if (payload.senderSessionId && payload.senderSessionId === sync.sessionId) {
+        console.log('MusicSync: Ignoring self-initiated update (this tab)');
         return;
       }
-      setCurrentMusic(data);
+      setCurrentMusic(payload.data);
     });
 
     // Subscribe to database changes (for persistence and cross-tab sync)
     const unsubDB = sync.subscribeToTable('sync_state', (payload: any) => {
       if (payload.new?.key === 'music') {
-        console.log('MusicSync: DB change detected:', payload.new.data);
-        // Ignore updates that we initiated ourselves
-        if (payload.new.data.lastUpdatedBy && payload.new.data.lastUpdatedBy === user) {
-          console.log('MusicSync: Ignoring self-initiated DB update');
-          return;
-        }
-        setCurrentMusic(payload.new.data);
+        const currentData = payload.new.data;
+        
+        // Ignore updates if they are already handled by broadcast or from this session
+        // (The broadcast is usually faster, so we only update from DB if needed)
+        setCurrentMusic(currentData);
       }
     });
 

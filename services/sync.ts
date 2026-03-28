@@ -8,11 +8,13 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 class SyncService {
+  public sessionId: string;
   private listeners: Record<string, Function[]> = {};
   private channel: any;
   private offlineQueue: any[] = [];
 
   constructor() {
+    this.sessionId = Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
     this.offlineQueue = this.getLocal('offline_queue', []);
 
     // Create a single persistent channel
@@ -84,7 +86,7 @@ class SyncService {
     const status = await this.channel.send({
       type: 'broadcast',
       event: 'state_change',
-      payload: { type, data },
+      payload: { type, data, senderSessionId: this.sessionId },
     });
 
     if (status !== 'ok') {
@@ -107,11 +109,15 @@ class SyncService {
         }
       }
 
-      const { error } = await supabase.from('sync_state').upsert({ key: type, data });
+      const { error } = await supabase.from('sync_state').upsert({ 
+        key: type, 
+        data,
+        updated_at: new Date().toISOString() // Explicitly update timestamp to trigger broadcast
+      });
       if (error) {
         console.error(`Sync: Failed to persist [${type}] to database:`, error);
       } else {
-        console.log(`Sync: Successfully persisted [${type}] to database`);
+        console.log(`Sync: Successfully persisted [${type}] with timestamp to database`);
       }
     }
   }

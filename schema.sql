@@ -223,3 +223,19 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ==========================================
+-- PERFORMANCE & RELIABILITY OPTIMIZATIONS
+-- ==========================================
+-- Run these to ensure JSONB columns are fully broadcasted by Realtime.
+
+ALTER TABLE public.sync_state REPLICA IDENTITY FULL;
+ALTER TABLE public.presence REPLICA IDENTITY FULL;
+ALTER TABLE public.canvas_strokes REPLICA IDENTITY FULL;
+
+-- ==========================================
+-- USER NOTE: 
+-- 1. Run the above ALTER TABLE commands in Supabase SQL Editor.
+-- 2. The sync service now handles 'updated_at' explicitly to force broadcasts.
+-- ==========================================
+
