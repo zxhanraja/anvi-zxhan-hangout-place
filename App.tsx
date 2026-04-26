@@ -11,19 +11,19 @@ import { Sidebar } from './components/Sidebar';
 import { Heart, ShieldCheck } from 'lucide-react';
 
 const IMAGES = {
-  Anvi: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg',
+  Zerah: 'https://ik.imagekit.io/ioktbcewp/210bb0865d9703f0e0724d670063773e.jpg',
   Zxhan: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg',
   // Optimized versions
-  Anvi_Thumb: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg?tr=w-100,h-100,f-auto',
+  Zerah_Thumb: 'https://ik.imagekit.io/ioktbcewp/210bb0865d9703f0e0724d670063773e.jpg?tr=w-100,h-100,f-auto',
   Zxhan_Thumb: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg?tr=w-100,h-100,f-auto',
-  Anvi_Login: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.30.06%20AM.jpeg?tr=w-400,h-600,f-auto',
+  Zerah_Login: 'https://ik.imagekit.io/ioktbcewp/210bb0865d9703f0e0724d670063773e.jpg?tr=w-400,h-600,f-auto',
   Zxhan_Login: 'https://ik.imagekit.io/ioktbcewp/WhatsApp%20Image%202026-02-13%20at%2010.32.21%20AM.jpeg?tr=w-400,h-600,f-auto'
 };
 
 const SHOW_ZXHAN_PROFILE = true;
 
 const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
-  const src = user === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb;
+  const src = user === 'Zerah' ? IMAGES.Zerah_Thumb : IMAGES.Zxhan_Thumb;
 
   return (
     <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500">
@@ -71,7 +71,7 @@ const App: React.FC = () => {
         });
 
         // Mark users as offline if they are NOT in the current presence state
-        ['Anvi', 'Zxhan'].forEach(u => {
+        ['Zerah', 'Zxhan'].forEach(u => {
           if (!usersInState.has(u) && p[u]) {
             p[u] = { ...p[u], isOnline: false, status: 'offline' };
           }
@@ -207,7 +207,7 @@ const App: React.FC = () => {
 
   const handleMissYou = async (type: 'shake' | 'missyou') => {
     if (!user) return;
-    const recipient = user === 'Anvi' ? 'Zxhan' : 'Anvi';
+    const recipient = user === 'Zerah' ? 'Zxhan' : 'Zerah';
 
     if (type === 'shake') {
       // Use new shake sync method
@@ -217,8 +217,8 @@ const App: React.FC = () => {
       // Heartbeat/Cinematic broadcast
       sync.publish('missyou', { sender: user, timestamp: Date.now(), type });
 
-      // Persistent Notification for Anvi's request
-      const notificationMsg = user === 'Anvi' ? 'Anvi was missing u' : `${user} was missing u`;
+      // Persistent Notification for Zerah's request
+      const notificationMsg = user === 'Zerah' ? 'Zerah was missing u' : `${user} was missing u`;
       await sync.sendNotification(user, recipient, notificationMsg);
 
       // Web3Forms Email Trigger (Keeping it as is but it's part of the persistent alert)
@@ -228,9 +228,9 @@ const App: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             access_key: 'YOUR-WEB3FORMS-KEY-HERE', // User should replace this
-            subject: user === 'Anvi' ? 'Anvi is missing you!' : `${user} misses you!`,
-            message: user === 'Anvi'
-              ? `Hey Zxhan, Anvi just sent you a signal from your Private Hangout. She's thinking about you!`
+            subject: user === 'Zerah' ? 'Zerah is missing you!' : `${user} misses you!`,
+            message: user === 'Zerah'
+              ? `Hey Zxhan, Zerah just sent you a signal from your Private Hangout. She's thinking about you!`
               : `Hey ${recipient}, ${user} just sent you a signal from your Private Hangout. Go check it out!`,
             from_name: 'Hangout Bot'
           })
@@ -250,7 +250,7 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  const otherUser = user === 'Anvi' ? 'Zxhan' : 'Anvi';
+  const otherUser = user === 'Zerah' ? 'Zxhan' : 'Zerah';
   const isOtherOnline = presence[otherUser]?.isOnline;
 
   const shakeVariants = {
@@ -289,7 +289,7 @@ const App: React.FC = () => {
               </div>
               <div className="w-7 h-7 md:w-10 md:h-10 rounded-full border border-white/[0.05] flex items-center justify-center bg-white/[0.02] overflow-hidden">
                 <img
-                  src={otherUser === 'Anvi' ? IMAGES.Anvi_Thumb : IMAGES.Zxhan_Thumb}
+                  src={otherUser === 'Zerah' ? IMAGES.Zerah_Thumb : IMAGES.Zxhan_Thumb}
                   alt={otherUser}
                   className="w-full h-full object-cover grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all"
                 />
@@ -352,7 +352,7 @@ const LoginScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =
           <div className="flex items-center justify-center gap-2 md:gap-4 mt-1 md:mt-2">
             <div className="h-[1px] w-8 md:w-12 bg-white/20" />
             <p className="font-display text-[8px] md:text-xs font-bold uppercase tracking-[0.6em] md:tracking-[0.8em] text-white/50 translate-x-[0.3em] md:translate-x-[0.4em]">
-              Anvi & Zxhan
+              Zerah & Zxhan
             </p>
             <div className="h-[1px] w-8 md:w-12 bg-white/20" />
           </div>
@@ -361,9 +361,9 @@ const LoginScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =
 
       <div className="flex flex-col md:flex-row gap-4 md:gap-12 z-10 w-full max-w-4xl justify-center items-center mt-20 md:mt-0">
         <LoginCard
-          user="Anvi"
-          img={IMAGES.Anvi_Login}
-          onClick={() => onLogin('Anvi')}
+          user="Zerah"
+          img={IMAGES.Zerah_Login}
+          onClick={() => onLogin('Zerah')}
           accent="#a855f7"
         />
         {SHOW_ZXHAN_PROFILE && (

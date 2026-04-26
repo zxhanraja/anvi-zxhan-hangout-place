@@ -7,19 +7,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export const Games: React.FC<{ user: User }> = ({ user }) => {
   const [currentGame, setCurrentGame] = useState<'tictactoe' | 'connect4' | 'word' | 'truthordare' | 'reaction' | 'rps' | 'menu'>('menu');
-  const [scores, setScores] = useState<Record<string, number>>({ Anvi: 0, Zxhan: 0 });
+  const [scores, setScores] = useState<Record<string, number>>({ Zerah: 0, Zxhan: 0 });
   const [winner, setWinner] = useState<{ name: User; msg: string } | null>(null);
 
   // States
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
   const [xIsNext, setXIsNext] = useState(true);
   const [c4Board, setC4Board] = useState<(string | null)[][]>(Array(6).fill(null).map(() => Array(7).fill(null)));
-  const [c4Turn, setC4Turn] = useState<User>('Anvi');
+  const [c4Turn, setC4Turn] = useState<User>('Zerah');
   const [wordState, setWordState] = useState({ word: '', guesses: [] as string[], setter: '' as User | '', status: 'setting' as 'setting' | 'guessing' | 'won' | 'lost' });
   const [wordInput, setWordInput] = useState('');
   const [tdActive, setTdActive] = useState<{ type: 'truth' | 'dare' | '', content: '' }>({ type: '', content: '' });
   const [reactionState, setReactionState] = useState({ status: 'waiting', startTime: 0, scores: {} as any });
-  const [rpsState, setRpsState] = useState<Record<User, string | null>>({ Anvi: null, Zxhan: null });
+  const [rpsState, setRpsState] = useState<Record<User, string | null>>({ Zerah: null, Zxhan: null });
 
   // TTT Infinity Logic: Track [ { index, symbol } ]
   const [tttHistory, setTttHistory] = useState<{ index: number; symbol: string }[]>([]);
@@ -30,7 +30,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     // Initial fetch
     sync.fetchScores().then(data => {
-      const s: any = { Anvi: 0, Zxhan: 0 };
+      const s: any = { Zerah: 0, Zxhan: 0 };
       data.forEach((item: any) => s[item.user_id] = item.score);
       setScores(s);
     });
@@ -88,7 +88,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       setTttHistory([]);
       setC4Board(Array(6).fill(null).map(() => Array(7).fill(null)));
       setWordState({ word: '', guesses: [], setter: '', status: 'setting' });
-      setRpsState({ Anvi: null, Zxhan: null });
+      setRpsState({ Zerah: null, Zxhan: null });
       setReactionState({ status: 'waiting', startTime: 0, scores: {} });
       setTdActive({ type: '', content: '' } as any);
       setWinner(null);
@@ -131,7 +131,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
   const resetGame = () => {
     setWinner(null);
-    const nextStarting = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+    const nextStarting = startingPlayer === 'Zerah' ? 'Zxhan' : 'Zerah';
     setStartingPlayer(nextStarting);
     sync.publish('game', { type: 'reset', startingPlayer: nextStarting });
   };
@@ -160,7 +160,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
       const winner = calculateTTTWinner(nextBoard);
       if (winner === 'X') handleWin('Zxhan');
-      if (winner === 'O') handleWin('Anvi');
+      if (winner === 'O') handleWin('Zerah');
     } else {
       nextBoard[i] = symbol;
       setBoard(nextBoard);
@@ -170,7 +170,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
 
       const winner = calculateTTTWinner(nextBoard);
       if (winner === 'X') handleWin('Zxhan');
-      if (winner === 'O') handleWin('Anvi');
+      if (winner === 'O') handleWin('Zerah');
     }
   };
 
@@ -186,7 +186,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
       }
     }
     if (placedRow === -1) return;
-    const nextTurn = user === 'Anvi' ? 'Zxhan' : 'Anvi';
+    const nextTurn = user === 'Zerah' ? 'Zxhan' : 'Zerah';
     setC4Board(nextBoard);
     setC4Turn(nextTurn);
     sync.publish('game', { type: 'connect4', board: nextBoard, turn: nextTurn });
@@ -201,16 +201,16 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     setRpsState(nextRps);
     sync.publish('game', { type: 'rps', state: nextRps });
 
-    if (nextRps.Anvi && nextRps.Zxhan) {
-      const res = getRPSResult(nextRps.Anvi, nextRps.Zxhan);
-      if (res === 'ANVI WINS') {
-        handleWin('Anvi');
+    if (nextRps.Zerah && nextRps.Zxhan) {
+      const res = getRPSResult(nextRps.Zerah, nextRps.Zxhan);
+      if (res === 'ZERAH WINS') {
+        handleWin('Zerah');
       } else if (res === 'ZXHAN WINS') {
         handleWin('Zxhan');
       } else {
         // Tie - reset after a short delay or just let them pick again
         setTimeout(() => {
-          const resetRps = { Anvi: null, Zxhan: null };
+          const resetRps = { Zerah: null, Zxhan: null };
           setRpsState(resetRps);
           sync.publish('game', { type: 'rps', state: resetRps });
         }, 2000);
@@ -226,7 +226,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     sync.publish('game', { type: 'reaction', state: nextState });
 
     // Check if both played
-    const other = user === 'Anvi' ? 'Zxhan' : 'Anvi';
+    const other = user === 'Zerah' ? 'Zxhan' : 'Zerah';
     if (nextState.scores[other]) {
       const myTime = time;
       const otherTime = nextState.scores[other];
@@ -282,8 +282,8 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
   const ScoreBoard = ({ minimal = false }: { minimal?: boolean }) => (
     <div className={`flex items-center justify-center gap-3 md:gap-8 ${minimal ? 'mb-2' : 'mb-8'}`}>
       <div className={`flex flex-col items-center ${minimal ? 'p-2 md:p-3' : 'p-3 md:p-5'} bg-white/[0.02] border border-white/5 rounded-2xl min-w-[70px] md:min-w-[120px]`}>
-        <span className="text-[7px] md:text-[10px] font-black tracking-widest opacity-30 italic leading-none">ANVI</span>
-        <span className={`${minimal ? 'text-xl md:text-2xl' : 'text-2xl md:text-4xl'} font-display font-black text-[var(--accent)] mt-1`}>{scores.Anvi}</span>
+        <span className="text-[7px] md:text-[10px] font-black tracking-widest opacity-30 italic leading-none">ZERAH</span>
+        <span className={`${minimal ? 'text-xl md:text-2xl' : 'text-2xl md:text-4xl'} font-display font-black text-[var(--accent)] mt-1`}>{scores.Zerah}</span>
       </div>
       <div className="h-6 md:h-8 w-[1px] bg-white/5" />
       <div className={`flex flex-col items-center ${minimal ? 'p-2 md:p-3' : 'p-3 md:p-5'} bg-white/[0.02] border border-white/5 rounded-2xl min-w-[70px] md:min-w-[120px]`}>
@@ -374,7 +374,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
               <p className="text-[7px] md:text-[8px] font-bold text-blue-500 uppercase tracking-[0.4em]">4 IN A ROW TO CONQUER</p>
             </div>
             <div className="flex items-center gap-4 mb-4">
-              <div className={`w-3 h-3 rounded-full ${c4Turn === 'Anvi' ? 'bg-purple-500 animate-pulse' : 'bg-white/10'}`} />
+              <div className={`w-3 h-3 rounded-full ${c4Turn === 'Zerah' ? 'bg-purple-500 animate-pulse' : 'bg-white/10'}`} />
               <span className="text-[10px] font-black uppercase tracking-widest italic">{c4Turn}'S TURN</span>
               <div className={`w-3 h-3 rounded-full ${c4Turn === 'Zxhan' ? 'bg-blue-500 animate-pulse' : 'bg-white/10'}`} />
             </div>
@@ -389,7 +389,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
                           key={rowIndex}
                           onClick={() => handleC4Click(colIndex)}
                           className={`w-10 h-10 md:w-14 md:h-14 rounded-full border border-white/5 transition-all flex items-center justify-center
-                          ${!cell ? 'bg-black/40 hover:bg-black/60' : (cell === 'Anvi' ? 'bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]')}
+                          ${!cell ? 'bg-black/40 hover:bg-black/60' : (cell === 'Zerah' ? 'bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]')}
                         `}
                         >
                           {cell && <div className="w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-white/20" />}
@@ -457,14 +457,14 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
             </div>
             <div className="flex justify-between w-full mb-4 px-4 md:px-8">
               <div className="flex flex-col items-center gap-3">
-                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Anvi ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
-                  {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Anvi) : (rpsState.Anvi ? '✅' : '?')}
+                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Zerah ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
+                  {rpsState.Zerah && rpsState.Zxhan ? getRPSGlyph(rpsState.Zerah) : (rpsState.Zerah ? '✅' : '?')}
                 </div>
-                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ANVI</span>
+                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ZERAH</span>
               </div>
               <div className="flex flex-col items-center gap-3">
                 <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Zxhan ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
-                  {rpsState.Anvi && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
+                  {rpsState.Ishani && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
                 </div>
                 <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ZXHAN</span>
               </div>
@@ -605,7 +605,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
                 <button
                   onClick={() => {
                     if (currentGame === 'tictactoe') {
-                      const nextStart = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+                      const nextStart = startingPlayer === 'Zerah' ? 'Zxhan' : 'Zerah';
                       const nextBoard = Array(9).fill(null);
                       setBoard(nextBoard);
                       setTttHistory([]);
@@ -617,9 +617,9 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
                         history: []
                       });
                     }
-                    if (currentGame === 'rps') { setRpsState({ Anvi: null, Zxhan: null }); sync.publish('game', { type: 'rps', state: { Anvi: null, Zxhan: null } }); }
+                    if (currentGame === 'rps') { setRpsState({ Zerah: null, Zxhan: null }); sync.publish('game', { type: 'rps', state: { Zerah: null, Zxhan: null } }); }
                     if (currentGame === 'connect4') {
-                      const nextStart = startingPlayer === 'Anvi' ? 'Zxhan' : 'Anvi';
+                      const nextStart = startingPlayer === 'Zerah' ? 'Zxhan' : 'Zerah';
                       const nextBoard = Array(6).fill(null).map(() => Array(7).fill(null));
                       setC4Board(nextBoard);
                       setC4Turn(nextStart);
@@ -689,6 +689,6 @@ function getRPSResult(m1: string, m2: string) {
     lizard: ['spock', 'paper'],
     spock: ['scissors', 'rock']
   };
-  if (rules[m1].includes(m2)) return "ANVI WINS";
+  if (rules[m1].includes(m2)) return "ZERAH WINS";
   return "ZXHAN WINS";
 }

@@ -127,7 +127,7 @@ export const Music: React.FC<{ user: User }> = ({ user }) => {
             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center"><MusicIcon className="w-5 h-5" /></div>
             <div className="flex-1">
               <p className="text-xs font-bold truncate">Up Next: Midnight City</p>
-              <p className="text-[10px] text-gray-500">Requested by Anvi</p>
+              <p className="text-[10px] text-gray-500">Requested by Zerah</p>
             </div>
           </div>
         </div>
