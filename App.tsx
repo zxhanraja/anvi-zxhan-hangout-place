@@ -47,7 +47,7 @@ const App: React.FC = () => {
   // }, []);
 
   useEffect(() => {
-    const unsubTheme = sync.subscribe('theme', (data: any) => {
+    const unsubTheme = sync.subscribe('theme', ({ data }: any) => {
       setAccent(data.accent);
       localStorage.setItem('theme_accent', data.accent);
     });
@@ -81,7 +81,7 @@ const App: React.FC = () => {
       });
     });
 
-    const unsubPresence = sync.subscribe('presence', (data: any) => {
+    const unsubPresence = sync.subscribe('presence', ({ data }: any) => {
       setPresence((prev: any) => ({ ...prev, [data.user]: data }));
     });
 
@@ -93,17 +93,17 @@ const App: React.FC = () => {
       }
     });
 
-    const unsubMissYou = sync.subscribe('missyou', (data: any) => {
-      if (data.sender !== user) {
+    const unsubMissYou = sync.subscribe('missyou', ({ data, senderSessionId }: any) => {
+      if (senderSessionId !== sync.sessionId) {
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 800);
       }
     });
 
-    const unsubShake = sync.subscribe('shake', (data: any) => {
+    const unsubShake = sync.subscribe('shake', ({ data }: any) => {
       // Only shake if the current user is the recipient
       if (data.recipient === user || data.to === user) {
-        console.log('Shake received from:', data.sender || data.from, 'for:', user);
+        console.log('Shake received for:', user);
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 800);
       }

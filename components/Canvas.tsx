@@ -91,10 +91,10 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
       strokes.forEach(s => drawAction(s));
     });
 
-    const unsubDrawing = sync.subscribe('drawing', (action: any) => {
-      console.log('Canvas: Received broadcast action:', action);
-      if (action.user === user) return;
-      drawAction(action);
+    const unsubDrawing = sync.subscribe('drawing', ({ data, senderSessionId }: any) => {
+      console.log('Canvas: Received broadcast action:', data);
+      if (senderSessionId === sync.sessionId) return;
+      drawAction(data);
     });
 
     // Subscribe to database changes for persistence

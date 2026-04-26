@@ -95,8 +95,11 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
     };
 
     // Subscriptions
-    const unsubBroadcast = sync.subscribe('game', (data: any) => handleIncomingGameState(data, false));
-    const unsubScores = sync.subscribe('scores', (data: any) => setScores(prev => ({ ...prev, [data.user]: data.score })));
+    const unsubBroadcast = sync.subscribe('game', ({ data, senderSessionId }: any) => {
+      if (senderSessionId === sync.sessionId) return;
+      handleIncomingGameState(data, false);
+    });
+    const unsubScores = sync.subscribe('scores', ({ data }: any) => setScores(prev => ({ ...prev, [data.user]: data.score })));
     const unsubScoreTable = sync.subscribeToTable('scores', (payload: any) => {
       if (payload.new) setScores(prev => ({ ...prev, [payload.new.user_id]: payload.new.score }));
     });
@@ -464,7 +467,7 @@ export const Games: React.FC<{ user: User }> = ({ user }) => {
               </div>
               <div className="flex flex-col items-center gap-3">
                 <div className={`w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-3xl border-2 ${rpsState.Zxhan ? 'bg-white/10 border-white' : 'bg-white/5 border-white/5'} flex items-center justify-center text-3xl md:text-4xl shadow-2xl`}>
-                  {rpsState.Ishani && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
+                  {rpsState.Zerah && rpsState.Zxhan ? getRPSGlyph(rpsState.Zxhan) : (rpsState.Zxhan ? '✅' : '?')}
                 </div>
                 <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-20 italic">ZXHAN</span>
               </div>

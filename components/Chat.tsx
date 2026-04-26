@@ -71,37 +71,23 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
       setOfflineQueue(queue);
     });
 
-    // Subscribe to new messages from Supabase Realtime
-    console.log('Subscribing to messages_channel...');
-    const subscription = supabase
-      .channel('messages_channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        console.log('New message received via Realtime:', payload.new);
+    // Subscribe to new messages from Supabase via central SyncService
+    const unsubMessages = sync.subscribeToTable('messages', (payload: any) => {
+      if (payload.eventType === 'INSERT') {
         const msg = payload.new as Message;
         setMessages(prev => {
           if (prev.find(m => m.id === msg.id)) return prev;
           return [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
         });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
-        console.log('Message updated via Realtime:', payload.new);
+      } else if (payload.eventType === 'UPDATE') {
         const updated = payload.new as Message;
         setMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
-      })
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          // Every time we get back to SUBSCRIBED, refetch to be absolutely sure we didn't miss anything
-          loadMessages();
-        }
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime subscription failed. Ensure that "Realtime" is enabled for the "messages" table in Supabase.');
-        }
-      });
+      }
+    });
 
-    const unsubChat = sync.subscribe('chat', (msg: Message) => {
+    const unsubChat = sync.subscribe('chat', ({ data: msg, senderSessionId }: any) => {
+      if (senderSessionId === sync.sessionId) return;
       console.log('Instant message received via Broadcast:', msg);
-      if (msg.sender === user) return; // Fix: Don't process our own broadcast
       setMessages(prev => {
         if (prev.find(m => m.id === msg.id)) return prev;
         return [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
@@ -109,9 +95,8 @@ export const Chat: React.FC<{ user: User; isActive: boolean }> = ({ user, isActi
     });
 
     return () => {
-      console.log('Unsubscribing from channels');
       window.removeEventListener('online', handleReconnection);
-      subscription.unsubscribe();
+      unsubMessages();
       unsubChat();
       unsubQueue();
     };

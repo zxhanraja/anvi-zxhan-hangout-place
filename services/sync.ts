@@ -10,60 +10,72 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 class SyncService {
   public sessionId: string;
   private listeners: Record<string, Function[]> = {};
-  private channel: any;
+  private mainChannel: any;
+  private tableChannels: Record<string, any> = {};
   private offlineQueue: any[] = [];
+  private isConnected = false;
 
   constructor() {
     this.sessionId = Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
     this.offlineQueue = this.getLocal('offline_queue', []);
+    
+    this.initMainChannel();
 
-    // Create a single persistent channel
-    this.channel = supabase.channel('hangout_sync');
+    // Listen for online status to trigger reconnection
+    window.addEventListener('online', () => {
+      console.log('Sync: Browser back online, reconnecting...');
+      this.reconnect();
+    });
+  }
 
-    this.channel
+  private initMainChannel() {
+    if (this.mainChannel) {
+      this.mainChannel.unsubscribe();
+    }
+
+    this.mainChannel = supabase.channel('hangout_sync');
+
+    this.mainChannel
       .on('presence', { event: 'sync' }, () => {
-        const state = this.channel.presenceState();
-        if (this.listeners['presence_sync']) {
-          this.listeners['presence_sync'].forEach(cb => cb(state));
-        }
+        const state = this.mainChannel.presenceState();
+        this.trigger('presence_sync', state);
       })
       .on('broadcast', { event: 'state_change' }, (payload: any) => {
-        const { type, data } = payload;
-        console.log(`Sync: Received broadcast [${type}]`, data);
-        if (this.listeners[type]) {
-          this.listeners[type].forEach(cb => cb(data));
-        }
+        const { type, data, senderSessionId } = payload;
+        console.log(`Sync: Received broadcast [${type}] from ${senderSessionId}`, data);
+        // We pass the full metadata to the listener so it can filter if needed
+        this.trigger(type, { data, senderSessionId, type });
       })
       .subscribe((status: string, err?: any) => {
+        this.isConnected = status === 'SUBSCRIBED';
         if (status === 'SUBSCRIBED') {
           console.log('Sync: Connected to Realtime');
           this.processOfflineQueue();
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.warn(`Sync: Connection ${status}, re-subscribing...`, err);
-          setTimeout(() => {
-            console.log('Sync: Attempting to re-subscribe...');
-            this.channel.subscribe();
-          }, 2000);
-        } else {
-          console.warn('Sync Status:', status, err);
+          console.warn(`Sync: Connection ${status}, re-subscribing in 3s...`, err);
+          setTimeout(() => this.mainChannel.subscribe(), 3000);
         }
       });
+  }
 
-    // Listen for online status
-    window.addEventListener('online', () => this.processOfflineQueue());
-
-    // Subscribe to shake_events table for realtime shake notifications
-    this.subscribeToTable('shake_events', (payload: any) => {
-      if (payload.eventType === 'INSERT' && this.listeners['shake']) {
-        const data = payload.new;
-        this.listeners['shake'].forEach(cb => cb(data));
-      }
+  reconnect() {
+    this.initMainChannel();
+    // Also re-subscribe to all table channels
+    Object.keys(this.tableChannels).forEach(tableName => {
+      this.tableChannels[tableName].subscribe();
     });
+    this.processOfflineQueue();
+  }
+
+  private trigger(type: string, data: any) {
+    if (this.listeners[type]) {
+      this.listeners[type].forEach(cb => cb(data));
+    }
   }
 
   async trackUser(user: string, status: 'online' | 'away' | 'offline') {
-    if (this.channel) {
-      await this.channel.track({
+    if (this.mainChannel) {
+      await this.mainChannel.track({
         user,
         status,
         online_at: new Date().toISOString(),
@@ -82,8 +94,7 @@ class SyncService {
   async publish(type: string, data: any) {
     console.log(`Sync: Publishing [${type}]`, data);
 
-    // For high-frequency data like drawing, we use broadcast directly
-    const status = await this.channel.send({
+    const status = await this.mainChannel.send({
       type: 'broadcast',
       event: 'state_change',
       payload: { type, data, senderSessionId: this.sessionId },
@@ -91,52 +102,32 @@ class SyncService {
 
     if (status !== 'ok') {
       console.warn(`Sync: Broadcast [${type}] failed:`, status);
-      // If broadcast fails, we might need to re-subscribe if the channel went dead
       if (status === 'error' || status === 'timed out') {
-        console.log('Sync: Channel might be dead, re-subscribing...');
-        this.channel.subscribe();
+        this.mainChannel.subscribe();
       }
     }
 
-    // Save to database for persistence (theme, music, and game state always persist)
-    if (type === 'theme' || type === 'music' || type === 'game') {
-      // For music, ensure we capture the current playback position
-      if (type === 'music' && data.currentPosition === undefined && data.ytId) {
-        // If no position provided, try to preserve existing position
-        const existing = await this.fetchSyncState('music');
-        if (existing && existing.ytId === data.ytId) {
-          data.currentPosition = existing.currentPosition || 0;
-        }
-      }
-
+    // Save to database for persistence
+    if (['theme', 'music', 'game'].includes(type)) {
       const { error } = await supabase.from('sync_state').upsert({ 
         key: type, 
         data,
-        updated_at: new Date().toISOString() // Explicitly update timestamp to trigger broadcast
+        updated_at: new Date().toISOString()
       });
-      if (error) {
-        console.error(`Sync: Failed to persist [${type}] to database:`, error);
-      } else {
-        console.log(`Sync: Successfully persisted [${type}] with timestamp to database`);
-      }
+      if (error) console.error(`Sync: Persistence failed [${type}]`, error);
     }
   }
 
   async saveMessage(msg: any) {
     if (!navigator.onLine) {
-      console.log('Offline: Queuing message', msg.id);
       this.addToQueue({ type: 'message', data: msg });
       return;
     }
 
     try {
       const { error } = await supabase.from('messages').insert([msg]);
-      if (error) {
-        console.error('Supabase error saving message, queuing...', error);
-        this.addToQueue({ type: 'message', data: msg });
-      }
+      if (error) this.addToQueue({ type: 'message', data: msg });
     } catch (e) {
-      console.error('Network catch saving message, queuing...', e);
       this.addToQueue({ type: 'message', data: msg });
     }
   }
@@ -146,16 +137,12 @@ class SyncService {
       this.offlineQueue.push(item);
       this.saveLocal('offline_queue', this.offlineQueue);
     }
-    // Trigger any UI listeners that might want to know queue changed
-    if (this.listeners['queue_change']) {
-      this.listeners['queue_change'].forEach(cb => cb(this.offlineQueue));
-    }
+    this.trigger('queue_change', this.offlineQueue);
   }
 
   async processOfflineQueue() {
     if (!navigator.onLine || this.offlineQueue.length === 0) return;
 
-    console.log('Processing offline queue...');
     const queue = [...this.offlineQueue];
     this.offlineQueue = [];
     this.saveLocal('offline_queue', []);
@@ -169,14 +156,10 @@ class SyncService {
           await this.sendNotification(item.data.from, item.data.to, item.data.type);
         }
       } catch (e) {
-        console.error('Failed to process queue item, returning to queue:', e);
         this.addToQueue(item);
       }
     }
-
-    if (this.listeners['queue_change']) {
-      this.listeners['queue_change'].forEach(cb => cb(this.offlineQueue));
-    }
+    this.trigger('queue_change', this.offlineQueue);
   }
 
   async sendNotification(from: string, to: string, type: string) {
@@ -191,17 +174,14 @@ class SyncService {
     const isOnline = status === 'online';
     const data = { user, isOnline, status, lastSeen: Date.now() };
 
-    // Use built-in tracking for state sync
     await this.trackUser(user, status);
 
-    // Broadcast via ephemeral channel for immediate UI update (keeping old way for legacy compat if needed)
-    await this.channel.send({
+    await this.mainChannel.send({
       type: 'broadcast',
       event: 'state_change',
-      payload: { type: 'presence', data },
+      payload: { type: 'presence', data, senderSessionId: this.sessionId },
     });
 
-    // Also persist to DB so people joining later see it
     if (navigator.onLine) {
       try {
         await supabase.from('presence').upsert({
@@ -216,120 +196,19 @@ class SyncService {
     }
   }
 
-  private strokeBuffer: any[] = [];
-  private strokeTimer: any = null;
-
-  async saveStroke(type: string, user: string, data: any) {
-    if (type === 'clear') {
-      this.strokeBuffer = []; // Clear pending strokes
-      await this.clearStrokes();
-      return;
-    }
-
-    // Buffer strokes to reduce DB pressure
-    this.strokeBuffer.push({
-      type,
-      user_id: user,
-      data,
-      timestamp: Date.now()
-    });
-
-    if (!this.strokeTimer) {
-      this.strokeTimer = setTimeout(async () => {
-        await this.flushStrokes();
-      }, 100); // Save every 100ms for better real-time sync
-    }
-  }
-
-  // Force immediate save of all pending strokes
-  async flushStrokes() {
-    if (this.strokeTimer) {
-      clearTimeout(this.strokeTimer);
-      this.strokeTimer = null;
-    }
-
-    const batch = [...this.strokeBuffer];
-    this.strokeBuffer = [];
-
-    if (navigator.onLine && batch.length > 0) {
-      try {
-        console.log(`Sync: Flushing ${batch.length} strokes to database`);
-        await supabase.from('canvas_strokes').insert(batch);
-      } catch (e) {
-        console.error('Error saving strokes batch:', e);
-      }
-    }
-  }
-
-  async fetchStrokes() {
-    const { data, error } = await supabase
-      .from('canvas_strokes')
-      .select('*')
-      .order('timestamp', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching strokes:', error);
-      return [];
-    }
-    return data || [];
-  }
-
-  async clearStrokes() {
-    await supabase.from('canvas_strokes').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-  }
-
-  async updateScore(user: string, points: number) {
-    // Fetch current score
-    const { data } = await supabase.from('scores').select('score').eq('user_id', user).single();
-    const currentScore = data?.score || 0;
-
-    // Upsert new score
-    await supabase.from('scores').upsert({
-      user_id: user,
-      score: currentScore + points,
-      updated_at: Date.now()
-    });
-
-    // Broadcast update
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'state_change',
-      payload: { type: 'scores', data: { user, score: currentScore + points } },
-    });
-  }
-
-  async fetchScores() {
-    const { data } = await supabase.from('scores').select('*');
-    return data || [];
-  }
-
-  async fetchNotifications(user: string) {
-    const { data } = await supabase.from('notifications').select('*').eq('recipient', user).order('timestamp', { ascending: false });
-    return data || [];
-  }
-
-  getQueue() {
-    return this.offlineQueue;
-  }
+  // --- PERSISTENCE HELPERS ---
 
   async fetchMessages() {
-    console.log('Sync: Fetching messages from Supabase...');
     const { data, error } = await supabase
       .from('messages')
       .select('*')
       .order('timestamp', { ascending: true })
-      .limit(10000);
+      .limit(1000);
 
     if (error) {
-      console.error('Supabase fetch error:', error.message, error.details, error.hint);
-      // If we are getting a 404 or connection error, it's likely the URL/Key is wrong
-      if (error.message.includes('FetchError') || error.message.includes('Failed to fetch')) {
-        console.warn('CRITICAL: Supabase connection failed. Check your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
-      }
+      console.error('Supabase fetch error:', error);
       return [];
     }
-
-    console.log(`Sync: Successfully fetched ${data?.length || 0} messages`);
     return data || [];
   }
 
@@ -340,62 +219,87 @@ class SyncService {
       .eq('key', key)
       .single();
 
-    if (error) {
-      console.log(`Sync: No state found for key '${key}'`);
-      return null;
-    }
-    return data?.data || null;
+    return error ? null : data?.data;
   }
 
-  subscribeToTable(table: string, callback: Function) {
-    const channel = supabase
-      .channel(`${table}_changes`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        (payload) => {
-          console.log(`Sync: Table ${table} changed:`, payload);
-          callback(payload);
-        }
-      )
-      .subscribe();
+  async fetchScores() {
+    const { data } = await supabase.from('scores').select('*');
+    return data || [];
+  }
 
+  async updateScore(user: string, points: number) {
+    const { data } = await supabase.from('scores').select('score').eq('user_id', user).single();
+    const newScore = (data?.score || 0) + points;
+
+    await supabase.from('scores').upsert({ user_id: user, score: newScore, updated_at: Date.now() });
+    
+    await this.publish('scores', { user, score: newScore });
+  }
+
+  // --- TABLE SUBSCRIPTION HUB ---
+
+  subscribeToTable(table: string, callback: Function) {
+    if (!this.tableChannels[table]) {
+      this.tableChannels[table] = supabase
+        .channel(`${table}_changes`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+          this.trigger(`${table}_table_update`, payload);
+        })
+        .subscribe();
+    }
+
+    const unsub = this.subscribe(`${table}_table_update`, callback);
     return () => {
-      channel.unsubscribe();
+      unsub();
+      // We keep the channel alive as other components might be using it
     };
   }
 
-  async sendShake(from: string, to: string) {
-    await supabase.from('shake_events').insert([{
-      sender: from,
-      recipient: to,
-      timestamp: Date.now(),
-      acknowledged: false
-    }]);
+  // --- CANVAS SYNC ---
 
-    // Also broadcast for instant notification
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'state_change',
-      payload: { type: 'shake', data: { from, to, timestamp: Date.now() } },
-    });
+  private strokeBuffer: any[] = [];
+  private strokeTimer: any = null;
+
+  async saveStroke(type: string, user: string, data: any) {
+    if (type === 'clear') {
+      this.strokeBuffer = [];
+      await supabase.from('canvas_strokes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      return;
+    }
+
+    this.strokeBuffer.push({ type, user_id: user, data, timestamp: Date.now() });
+
+    if (!this.strokeTimer) {
+      this.strokeTimer = setTimeout(async () => {
+        const batch = [...this.strokeBuffer];
+        this.strokeBuffer = [];
+        this.strokeTimer = null;
+        if (navigator.onLine && batch.length > 0) {
+          await supabase.from('canvas_strokes').insert(batch);
+        }
+      }, 200);
+    }
+  }
+
+  async fetchStrokes() {
+    const { data } = await supabase.from('canvas_strokes').select('*').order('timestamp', { ascending: true });
+    return data || [];
+  }
+
+  // --- MISC ---
+
+  async sendShake(from: string, to: string) {
+    await supabase.from('shake_events').insert([{ sender: from, recipient: to, timestamp: Date.now(), acknowledged: false }]);
+    await this.publish('shake', { from, to, timestamp: Date.now() });
   }
 
   async fetchShakes(user: string) {
-    const { data } = await supabase
-      .from('shake_events')
-      .select('*')
-      .eq('recipient', user)
-      .eq('acknowledged', false)
-      .order('timestamp', { ascending: false });
+    const { data } = await supabase.from('shake_events').select('*').eq('recipient', user).eq('acknowledged', false);
     return data || [];
   }
 
   async acknowledgeShake(id: string) {
-    await supabase
-      .from('shake_events')
-      .update({ acknowledged: true })
-      .eq('id', id);
+    await supabase.from('shake_events').update({ acknowledged: true }).eq('id', id);
   }
 
   saveLocal(key: string, data: any) {
@@ -406,6 +310,8 @@ class SyncService {
     const d = localStorage.getItem(key);
     return d ? JSON.parse(d) : fallback;
   }
+
+  getQueue() { return this.offlineQueue; }
 }
 
 export const sync = new SyncService();
