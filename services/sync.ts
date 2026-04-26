@@ -40,10 +40,17 @@ class SyncService {
         const state = this.mainChannel.presenceState();
         this.trigger('presence_sync', state);
       })
+      .on('presence', { event: 'join' }, ({ key, newPresences }: any) => {
+        console.log('Sync: Presence join', key, newPresences);
+        this.trigger('presence_sync', this.mainChannel.presenceState());
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }: any) => {
+        console.log('Sync: Presence leave', key, leftPresences);
+        this.trigger('presence_sync', this.mainChannel.presenceState());
+      })
       .on('broadcast', { event: 'state_change' }, (payload: any) => {
         const { type, data, senderSessionId } = payload;
         console.log(`Sync: Received broadcast [${type}] from ${senderSessionId}`, data);
-        // We pass the full metadata to the listener so it can filter if needed
         this.trigger(type, { data, senderSessionId, type });
       })
       .subscribe((status: string, err?: any) => {
@@ -51,6 +58,8 @@ class SyncService {
         if (status === 'SUBSCRIBED') {
           console.log('Sync: Connected to Realtime');
           this.processOfflineQueue();
+          // Trigger initial presence sync
+          this.trigger('presence_sync', this.mainChannel.presenceState());
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           console.warn(`Sync: Connection ${status}, re-subscribing in 3s...`, err);
           setTimeout(() => this.mainChannel.subscribe(), 3000);
@@ -81,6 +90,10 @@ class SyncService {
         online_at: new Date().toISOString(),
       });
     }
+  }
+
+  getPresenceState() {
+    return this.mainChannel ? this.mainChannel.presenceState() : {};
   }
 
   subscribe(type: string, callback: Function) {

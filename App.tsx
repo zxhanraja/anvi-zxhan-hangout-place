@@ -58,8 +58,9 @@ const App: React.FC = () => {
         const usersInState = new Set();
 
         Object.keys(state).forEach(key => {
-          const presenceEntry = state[key][0];
-          if (presenceEntry) {
+          const presenceEntries = state[key];
+          if (presenceEntries && presenceEntries.length > 0) {
+            const presenceEntry = presenceEntries[0];
             usersInState.add(presenceEntry.user);
             p[presenceEntry.user] = {
               user: presenceEntry.user,
@@ -72,8 +73,8 @@ const App: React.FC = () => {
 
         // Mark users as offline if they are NOT in the current presence state
         ['Zerah', 'Zxhan'].forEach(u => {
-          if (!usersInState.has(u) && p[u]) {
-            p[u] = { ...p[u], isOnline: false, status: 'offline' };
+          if (!usersInState.has(u)) {
+            p[u] = { user: u, isOnline: false, status: 'offline', lastSeen: Date.now() };
           }
         });
 
@@ -109,22 +110,42 @@ const App: React.FC = () => {
       }
     });
 
-    // Initial presence fetch from DB (fallback)
+    // Initial presence fetch from DB (fallback) and current state
+    const currentPresence = sync.getPresenceState();
+    if (Object.keys(currentPresence).length > 0) {
+      // If we already have presence state from channel, use it
+      const p: any = {};
+      Object.keys(currentPresence).forEach(key => {
+        const entry = currentPresence[key][0];
+        if (entry) {
+          p[entry.user] = {
+            user: entry.user,
+            isOnline: entry.status === 'online',
+            status: entry.status,
+            lastSeen: Date.now()
+          };
+        }
+      });
+      setPresence(prev => ({ ...prev, ...p }));
+    }
+
     supabase.from('presence').select('*').then(({ data }) => {
       if (data) {
         const p: any = {};
         const now = Date.now();
         data.forEach((item: any) => {
-          // If last seen is older than 2 minutes, assume offline
-          const isRecent = now - item.last_seen < 120000;
-          p[item.user_id] = {
-            user: item.user_id,
-            isOnline: isRecent ? item.is_online : false,
-            status: isRecent ? item.status : 'offline',
-            lastSeen: item.last_seen
-          };
+          // Only use DB fallback if not already set by Realtime
+          if (!presence[item.user_id]) {
+            const isRecent = now - item.last_seen < 120000;
+            p[item.user_id] = {
+              user: item.user_id,
+              isOnline: isRecent ? item.is_online : false,
+              status: isRecent ? item.status : 'offline',
+              lastSeen: item.last_seen
+            };
+          }
         });
-        setPresence(p);
+        setPresence(prev => ({ ...prev, ...p }));
       }
     });
 

@@ -85,6 +85,8 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     resize();
     window.addEventListener('resize', handleResize);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('touchend', stop);
 
     // Initial fetch of strokes
     sync.fetchStrokes().then(strokes => {
@@ -112,10 +114,12 @@ export const Canvas: React.FC<{ user: User }> = ({ user }) => {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('touchend', stop);
       unsubDrawing();
       unsubTable();
     };
-  }, [user]);
+  }, [user, isDrawing]); // Add isDrawing to dependency so 'stop' has current state
 
   const lastPos = useRef({ x: 0, y: 0 });
   const lastSyncedPos = useRef({ x: 0, y: 0 });
